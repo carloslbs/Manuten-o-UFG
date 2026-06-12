@@ -3510,8 +3510,9 @@ let supabaseClient = null;
 let isSupabaseConnected = false;
 
 function initSupabase() {
-  const url = localStorage.getItem('supabase-url');
-  const key = localStorage.getItem('supabase-anon-key');
+  const disabled = localStorage.getItem('supabase-disabled') === '1';
+  const url = disabled ? '' : (localStorage.getItem('supabase-url') || 'https://szbunszlchnvakzotozq.supabase.co');
+  const key = disabled ? '' : (localStorage.getItem('supabase-anon-key') || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN6YnVuc3psY2hudmFrem90b3pxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkyNzExMTMsImV4cCI6MjA5NDg0NzExM30.Xy4BYDC9eubK2sSIoyq4FpztlrEH5YW4GwJGSVLJZ48');
   const statusEl = document.getElementById('sb-status');
   
   // Atualiza inputs no modal
@@ -3520,7 +3521,7 @@ function initSupabase() {
   if (urlInput) urlInput.value = url || '';
   if (keyInput) keyInput.value = key ? '••••••••••••••••••••' : '';
 
-  if (url && key) {
+  if (!disabled && url && key) {
     try {
       if (typeof supabase !== 'undefined') {
         supabaseClient = supabase.createClient(url, key);
@@ -3554,9 +3555,9 @@ async function saveSupabaseSettings() {
     return;
   }
   
-  // Se a chave não mudou (está com o placeholder de bolinhas), manter a chave anterior
+  // Se a chave não mudou (está com o placeholder de bolinhas), manter a chave anterior ou a padrão
   if (key === '••••••••••••••••••••') {
-    key = localStorage.getItem('supabase-anon-key') || '';
+    key = localStorage.getItem('supabase-anon-key') || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN6YnVuc3psY2hudmFrem90b3pxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkyNzExMTMsImV4cCI6MjA5NDg0NzExM30.Xy4BYDC9eubK2sSIoyq4FpztlrEH5YW4GwJGSVLJZ48';
   }
   
   if (!key) {
@@ -3566,6 +3567,7 @@ async function saveSupabaseSettings() {
 
   localStorage.setItem('supabase-url', url);
   localStorage.setItem('supabase-anon-key', key);
+  localStorage.removeItem('supabase-disabled');
   
   const connected = initSupabase();
   if (connected) {
@@ -3591,6 +3593,7 @@ function disconnectSupabase() {
   if (confirm("Deseja realmente desconectar do Supabase e voltar a usar os dados locais/de exemplo?")) {
     localStorage.removeItem('supabase-url');
     localStorage.removeItem('supabase-anon-key');
+    localStorage.setItem('supabase-disabled', '1');
     initSupabase();
     alert("Desconectado com sucesso! Recarregando dados locais...");
     location.reload();
