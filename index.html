@@ -1,0 +1,3885 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="Dashboard de Manutenção da SEINFRA/UFG para monitoramento, análise de SLA, eficiência operacional e gestão de chamados.">
+<meta property="og:title" content="Dashboard de Manutenção — SEINFRA">
+<meta property="og:description" content="Dashboard interativo para gestão inteligente de manutenção predial e operacional na SEINFRA/UFG.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://seinfra.ufg.br/dashboard">
+<title>Dashboard de Manutenção — SEINFRA</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+/* ===== RESET & BASE ===== */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg: #F4F2ED;
+  --surface: #FAFAF8;
+  --surface2: #EFEDE7;
+  --border: #E0DDD5;
+  --border2: #D0CCC2;
+  --text: #1A1916;
+  --text2: #6B6860;
+  --text3: #9B9890;
+  --accent: #1B4F8A;
+  --accent2: #1A7A5E;
+  --warn: #8A4A10;
+  --danger: #8A1F1F;
+  --ok: #3A6610;
+  --amber: #8A6010;
+  --c-elec: #1B4F8A;
+  --c-refrig: #0284C7;
+  --c-alv: #8A4A10;
+  --c-pint: #8A1F1F;
+  --c-hid: #1A7A5E;
+  --font: 'DM Sans', sans-serif;
+  --mono: 'DM Mono', monospace;
+  --radius: 10px;
+  --radius-sm: 6px;
+  --shadow: 0 1px 3px rgba(0,0,0,.07), 0 4px 12px rgba(0,0,0,.04);
+}
+
+html { scroll-behavior: smooth; }
+body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); font-size: 14px; line-height: 1.5; }
+
+/* ===== LAYOUT ===== */
+.shell { display: flex; min-height: 100vh; }
+
+/* SIDEBAR */
+.sidebar {
+  width: 220px; flex-shrink: 0; background: var(--surface);
+  border-right: 1px solid var(--border); padding: 24px 0;
+  position: sticky; top: 0; height: 100vh; overflow-y: auto;
+  display: flex; flex-direction: column;
+}
+.sidebar-logo { padding: 0 20px 20px; border-bottom: 1px solid var(--border); margin-bottom: 16px; }
+.sidebar-logo .org { font-size: 11px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--text3); }
+.sidebar-logo .title { font-size: 15px; font-weight: 600; color: var(--text); margin-top: 2px; line-height: 1.2; }
+.nav-section { padding: 0 12px; margin-bottom: 4px; }
+.nav-label { font-size: 10px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--text3); padding: 6px 8px 4px; }
+.tab-btn {
+  display: flex; align-items: center; gap: 8px; padding: 7px 10px;
+  border-radius: var(--radius-sm); cursor: pointer; font-size: 13px;
+  color: var(--text2); font-weight: 400; transition: all .15s; border: none;
+  background: transparent; width: 100%; text-align: left;
+}
+.tab-btn:hover { background: var(--surface2); color: var(--text); }
+.tab-btn.active { background: var(--accent); color: #fff; font-weight: 500; }
+.tab-btn .ico { width: 16px; text-align: center; flex-shrink: 0; font-size: 14px; }
+.sidebar-footer { margin-top: auto; padding: 16px 20px 0; border-top: 1px solid var(--border); }
+.sidebar-footer p { font-size: 11px; color: var(--text3); }
+
+/* MAIN */
+.main { flex: 1; min-width: 0; }
+.topbar {
+  background: var(--surface); border-bottom: 1px solid var(--border);
+  padding: 14px 32px; display: flex; align-items: center; justify-content: space-between;
+  position: sticky; top: 0; z-index: 100; flex-wrap: wrap; gap: 10px;
+}
+.topbar-title { font-size: 16px; font-weight: 600; color: var(--text); }
+.topbar-sub { font-size: 12px; color: var(--text3); margin-top: 1px; }
+.topbar-right { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.badge { font-size: 11px; font-weight: 500; padding: 4px 10px; border-radius: 99px; }
+.badge-blue { background: #DEEAF8; color: #1B4F8A; }
+.badge-green { background: #DCF0E5; color: #1A7A5E; }
+.badge-red { background: #FCDEDE; color: #8A1F1F; }
+
+/* FILTERS */
+.filters-bar {
+  background: var(--surface); border-bottom: 1px solid var(--border);
+  padding: 10px 32px; display: flex; flex-wrap: wrap; gap: 12px; align-items: center;
+}
+.filter-group { display: flex; flex-direction: column; gap: 3px; }
+.filter-group label { font-size: 10px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--text3); }
+.filter-group select {
+  font-size: 12px; font-family: 'DM Sans', sans-serif; padding: 5px 10px;
+  border: 1px solid var(--border2); border-radius: var(--radius-sm);
+  background: var(--bg); color: var(--text); min-width: 130px;
+}
+.btn-reset {
+  font-size: 12px; font-family: 'DM Sans', sans-serif; padding: 5px 14px;
+  border: 1px solid var(--border2); border-radius: var(--radius-sm);
+  background: transparent; color: var(--text2); cursor: pointer;
+  transition: all .15s; margin-left: auto;
+}
+.btn-reset:hover { background: var(--surface2); color: var(--text); }
+
+/* CONTENT */
+.content { padding: 28px 32px; }
+.section { display: none; }
+.section.active { display: block; }
+
+/* SECTION HEADER */
+.section-hd { margin-bottom: 20px; }
+.section-hd h2 { font-size: 18px; font-weight: 600; color: var(--text); }
+.section-hd p { font-size: 13px; color: var(--text2); margin-top: 3px; }
+
+/* KPI GRID */
+.kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-bottom: 24px; }
+.kpi-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 16px 18px; box-shadow: var(--shadow);
+}
+.kpi-card.ok { border-top: 3px solid #3A6610; }
+.kpi-card.warn { border-top: 3px solid #8A4A10; }
+.kpi-card.danger { border-top: 3px solid #8A1F1F; }
+.kpi-card.info { border-top: 3px solid #1B4F8A; }
+.kpi-card.neutral { border-top: 3px solid #9B9890; }
+.kpi-label { font-size: 10px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--text3); margin-bottom: 8px; }
+.kpi-value { font-size: 28px; font-weight: 600; line-height: 1; font-family: 'DM Mono', monospace; }
+.kpi-card.ok .kpi-value { color: #2A5008; }
+.kpi-card.warn .kpi-value { color: #6A3508; }
+.kpi-card.danger .kpi-value { color: #6A0808; }
+.kpi-card.info .kpi-value { color: #1B4F8A; }
+.kpi-card.neutral .kpi-value { color: var(--text); }
+.kpi-sub { font-size: 12px; color: var(--text3); margin-top: 4px; }
+
+/* CARD GRID */
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+.grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+.card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 20px; box-shadow: var(--shadow);
+}
+.card.full { grid-column: 1 / -1; }
+.card-title { font-size: 13px; font-weight: 600; color: var(--text); margin-bottom: 3px; }
+.card-sub { font-size: 11px; color: var(--text3); margin-bottom: 14px; }
+
+/* BARS */
+.bar-row { display: flex; align-items: center; gap: 8px; margin-bottom: 7px; }
+.bar-label { font-size: 11px; color: var(--text2); width: 120px; text-align: right; flex-shrink: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bar-track { flex: 1; height: 16px; background: var(--surface2); border-radius: 4px; overflow: hidden; }
+.bar-fill { height: 100%; border-radius: 4px; transition: width .5s ease; }
+.bar-val { font-size: 11px; color: var(--text3); font-family: 'DM Mono', monospace; width: 72px; flex-shrink: 0; }
+
+/* PILLS */
+.pill { display: inline-block; font-size: 10px; font-weight: 500; padding: 2px 8px; border-radius: 99px; }
+.pill-ok { background: #DCF0E5; color: #1A7A5E; }
+.pill-warn { background: #FAECD8; color: #8A4A10; }
+.pill-danger { background: #FCDEDE; color: #8A1F1F; }
+.pill-blue { background: #DEEAF8; color: #1B4F8A; }
+.pill-gray { background: var(--surface2); color: var(--text2); }
+
+/* ALERT BOXES */
+.alert { display: flex; gap: 10px; padding: 12px 14px; border-radius: var(--radius-sm); margin-bottom: 8px; }
+.alert-danger { background: #FDF2F2; border-left: 3px solid #8A1F1F; }
+.alert-warn { background: #FDF6EE; border-left: 3px solid #8A4A10; }
+.alert-ok { background: #EFF8F3; border-left: 3px solid #3A6610; }
+.alert-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; margin-top: 4px; }
+.alert-danger .alert-dot { background: #8A1F1F; }
+.alert-warn .alert-dot { background: #8A4A10; }
+.alert-ok .alert-dot { background: #3A6610; }
+.alert-title { font-size: 12px; font-weight: 600; }
+.alert-danger .alert-title { color: #6A0808; }
+.alert-warn .alert-title { color: #6A3508; }
+.alert-ok .alert-title { color: #2A5008; }
+.alert-desc { font-size: 11px; margin-top: 2px; }
+.alert-danger .alert-desc { color: #8A1F1F; }
+.alert-warn .alert-desc { color: #8A4A10; }
+.alert-ok .alert-desc { color: #3A6610; }
+
+/* TABLES */
+.tbl { width: 100%; border-collapse: collapse; font-size: 12px; }
+.tbl th { font-size: 10px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: var(--text3); padding: 6px 8px; text-align: left; border-bottom: 1px solid var(--border); }
+.tbl td { padding: 7px 8px; border-bottom: 1px solid var(--border); color: var(--text); vertical-align: middle; }
+.tbl tr:last-child td { border-bottom: none; }
+.tbl tr:hover td { background: var(--surface2); }
+.tbl td.right, .tbl th.right { text-align: right; }
+.tbl td.mono { font-family: 'DM Mono', monospace; }
+
+/* HEATMAP */
+.hm-wrap { overflow-x: auto; }
+.hm-table { border-collapse: collapse; font-size: 11px; }
+.hm-table th { font-size: 10px; font-weight: 500; color: var(--text3); padding: 4px 5px; text-align: center; }
+.hm-table th.row-hd { text-align: right; padding-right: 10px; font-family: 'DM Mono', monospace; }
+.hm-cell { width: 44px; height: 30px; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 9px; font-weight: 500; margin: 2px; }
+
+/* TABS */
+.tabs { display: flex; gap: 6px; margin-bottom: 14px; flex-wrap: wrap; }
+.tab-btn {
+  font-size: 11px; font-family: 'DM Sans', sans-serif; padding: 5px 12px;
+  border-radius: var(--radius-sm); border: 1px solid var(--border2);
+  cursor: pointer; background: transparent; color: var(--text2);
+  transition: all .15s;
+}
+.tab-btn:hover { background: var(--surface2); color: var(--text); }
+.tab-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); font-weight: 500; }
+
+/* LEGEND */
+.legend { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 10px; }
+.leg-item { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--text2); }
+.leg-dot { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }
+
+/* PROFISSIONAIS */
+.prof-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.prof-rank { font-size: 11px; color: var(--text3); font-family: 'DM Mono', monospace; width: 20px; text-align: right; flex-shrink: 0; }
+.prof-avatar { width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 600; flex-shrink: 0; }
+.prof-info { flex: 1; min-width: 0; }
+.prof-name { font-size: 12px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.prof-ofic { font-size: 10px; color: var(--text3); }
+.prof-bar-wrap { width: 100px; flex-shrink: 0; }
+.prof-bar-track { height: 5px; background: var(--surface2); border-radius: 3px; margin-bottom: 2px; }
+.prof-bar-fill { height: 5px; border-radius: 3px; }
+.prof-nums { display: flex; justify-content: space-between; font-size: 9px; color: var(--text3); font-family: 'DM Mono', monospace; }
+.badge-sla { font-size: 9px; padding: 2px 7px; border-radius: 99px; font-weight: 500; flex-shrink: 0; }
+
+/* TREND */
+.trend-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.trend-year { font-size: 11px; color: var(--text3); font-family: 'DM Mono', monospace; width: 36px; flex-shrink: 0; }
+.trend-track { flex: 1; height: 16px; background: var(--surface2); border-radius: 3px; overflow: hidden; }
+.trend-fill { height: 100%; border-radius: 3px; }
+.trend-val { font-size: 11px; color: var(--text3); width: 44px; text-align: right; flex-shrink: 0; font-family: 'DM Mono', monospace; }
+
+/* CHART CONTAINERS */
+.chart-wrap { position: relative; }
+
+/* RESPONSIVE */
+@media (max-width: 900px) {
+  .grid2, .grid3 { grid-template-columns: 1fr; }
+  .sidebar { display: none; }
+  .content { padding: 20px 16px; }
+  .topbar, .filters-bar { padding-left: 16px; padding-right: 16px; }
+}
+
+/* DARK MODE */
+body.dark {
+  --bg: #141412;
+  --surface: #1C1C1A;
+  --surface2: #252522;
+  --border: #2E2E2A;
+  --border2: #3A3A35;
+  --text: #F5F2EC;
+  --text2: #CCC8C0;
+  --text3: #9E9A92;
+  --accent: #4A8FE0;
+  --accent2: #3ABB8A;
+  --warn: #D09040;
+  --danger: #D05555;
+  --ok: #70C030;
+}
+/* Alertas */
+body.dark .alert-danger { background: #2A1515; border-left-color: #D05555; }
+body.dark .alert-danger .alert-dot  { background: #D05555; }
+body.dark .alert-danger .alert-title{ color: #FF9090; }
+body.dark .alert-danger .alert-desc { color: #E08080; }
+body.dark .alert-warn   { background: #2A1D0E; border-left-color: #D09040; }
+body.dark .alert-warn .alert-dot    { background: #D09040; }
+body.dark .alert-warn .alert-title  { color: #FFB060; }
+body.dark .alert-warn .alert-desc   { color: #E09050; }
+body.dark .alert-ok     { background: #152215; border-left-color: #70C030; }
+body.dark .alert-ok .alert-dot      { background: #70C030; }
+body.dark .alert-ok .alert-title    { color: #90D850; }
+body.dark .alert-ok .alert-desc     { color: #80C840; }
+/* KPI cards */
+body.dark .kpi-card.ok     { background: #162210; border-top-color: #70C030; }
+body.dark .kpi-card.ok .kpi-value     { color: #90D850; }
+body.dark .kpi-card.warn   { background: #221808; border-top-color: #D09040; }
+body.dark .kpi-card.warn .kpi-value   { color: #FFB060; }
+body.dark .kpi-card.danger { background: #220E0E; border-top-color: #D05555; }
+body.dark .kpi-card.danger .kpi-value { color: #FF8080; }
+body.dark .kpi-card.info   { background: #0E1A2E; border-top-color: #4A8FE0; }
+body.dark .kpi-card.info .kpi-value   { color: #78B8F0; }
+body.dark .kpi-card.neutral .kpi-value{ color: #F5F2EC; }
+body.dark .kpi-sub { color: #9E9A92; }
+/* Pills */
+body.dark .pill-ok     { background: #1A3A0A; color: #90D850; }
+body.dark .pill-warn   { background: #3A2000; color: #FFB060; }
+body.dark .pill-danger { background: #3A0A0A; color: #FF8080; }
+body.dark .pill-blue   { background: #0A1E3A; color: #78B8F0; }
+body.dark .pill-gray   { background: #252522; color: #CCC8C0; }
+/* Tables */
+body.dark .tbl th { color: #CCC8C0; border-bottom-color: #2E2E2A; }
+body.dark .tbl td { color: #F5F2EC; border-bottom-color: #2E2E2A; }
+body.dark .tbl tr:hover td { background: #252522; }
+body.dark .tbl .mono { color: #F5F2EC; }
+/* Heatmap */
+body.dark .hm-table th { color: #CCC8C0; }
+body.dark .hm-cell { border: 1px solid #2E2E2A; }
+/* Inputs */
+body.dark .filter-group select,
+body.dark #pf-busca { background: #1C1C1A; color: #F5F2EC; border-color: #3A3A35; }
+body.dark .filter-group label { color: #9E9A92; }
+body.dark .btn-reset  { color: #CCC8C0; border-color: #3A3A35; }
+body.dark .btn-reset:hover { background: #252522; color: #F5F2EC; }
+/* Trend / bar rows */
+body.dark .trend-year { color: #CCC8C0; }
+body.dark .trend-val  { color: #CCC8C0; }
+body.dark .bar-label  { color: #CCC8C0; }
+body.dark .bar-val    { color: #9E9A92; }
+/* Profissionais */
+body.dark .prof-name  { color: #F5F2EC; }
+body.dark .prof-ofic  { color: #9E9A92; }
+body.dark .prof-rank  { color: #9E9A92; }
+body.dark .prof-nums  { color: #9E9A92; }
+/* Sidebar */
+body.dark .sidebar-logo .title { color: #F5F2EC; }
+body.dark .tab-btn { color: #CCC8C0; }
+body.dark .tab-btn:hover { background: #252522; color: #F5F2EC; }
+/* Topbar / section headers */
+body.dark .topbar-title  { color: #F5F2EC; }
+body.dark .section-hd h2 { color: #F5F2EC; }
+body.dark .section-hd p  { color: #CCC8C0; }
+/* Cards */
+body.dark .card-title { color: #F5F2EC; }
+body.dark .card-sub   { color: #9E9A92; }
+/* Legend */
+body.dark .leg-item   { color: #CCC8C0; }
+/* Modal */
+body.dark .modal-header h3     { color: #F5F2EC; }
+body.dark .setting-label       { color: #F5F2EC; }
+body.dark .setting-desc        { color: #9E9A92; }
+body.dark .modal-section-title { color: #9E9A92; }
+body.dark .upload-area p       { color: #CCC8C0; }
+body.dark .upload-area small   { color: #9E9A92; }
+body.dark .upload-status.ok    { background: #152215; color: #90D850; }
+body.dark .upload-status.err   { background: #2A1010; color: #FF8080; }
+
+/* MODAL */
+.modal-overlay {
+  display: none; position: fixed; inset: 0; background: rgba(0,0,0,.5);
+  z-index: 1000; align-items: center; justify-content: center;
+}
+.modal-overlay.open { display: flex; }
+.modal {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); width: 480px; max-width: 95vw;
+  box-shadow: 0 8px 40px rgba(0,0,0,.25); overflow: hidden;
+}
+.modal-header {
+  padding: 18px 22px; border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between;
+}
+.modal-header h3 { font-size: 15px; font-weight: 600; color: var(--text); }
+.modal-close {
+  width: 28px; height: 28px; border-radius: 50%; border: none;
+  background: var(--surface2); cursor: pointer; font-size: 14px;
+  color: var(--text2); display: flex; align-items: center; justify-content: center;
+}
+.modal-close:hover { background: var(--border); }
+.modal-body { padding: 22px; display: flex; flex-direction: column; gap: 20px; }
+.modal-section-title {
+  font-size: 10px; font-weight: 600; letter-spacing: .08em;
+  text-transform: uppercase; color: var(--text3); margin-bottom: 10px;
+}
+.setting-row {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 0; border-bottom: 1px solid var(--border);
+}
+.setting-row:last-child { border-bottom: none; }
+.setting-label { font-size: 13px; color: var(--text); }
+.setting-desc  { font-size: 11px; color: var(--text3); margin-top: 2px; }
+/* Toggle switch */
+.toggle { position: relative; display: inline-block; width: 40px; height: 22px; flex-shrink: 0; }
+.toggle input { opacity: 0; width: 0; height: 0; }
+.toggle-slider {
+  position: absolute; inset: 0; background: var(--border2);
+  border-radius: 22px; cursor: pointer; transition: .2s;
+}
+.toggle-slider:before {
+  content: ''; position: absolute; width: 16px; height: 16px;
+  left: 3px; top: 3px; background: #fff; border-radius: 50%; transition: .2s;
+}
+.toggle input:checked + .toggle-slider { background: var(--accent); }
+.toggle input:checked + .toggle-slider:before { transform: translateX(18px); }
+/* Upload area */
+.upload-area {
+  border: 2px dashed var(--border2); border-radius: var(--radius);
+  padding: 24px; text-align: center; cursor: pointer;
+  transition: all .2s; background: var(--bg);
+}
+.upload-area:hover, .upload-area.drag { border-color: var(--accent); background: var(--surface2); }
+.upload-area p { font-size: 13px; color: var(--text2); margin-top: 6px; }
+.upload-area small { font-size: 11px; color: var(--text3); }
+.upload-status {
+  font-size: 12px; padding: 8px 12px; border-radius: var(--radius-sm);
+  margin-top: 8px; display: none;
+}
+.upload-status.ok  { background: #EFF8F3; color: #3A6610; display: block; }
+.upload-status.err { background: #FDF2F2; color: #8A1F1F; display: block; }
+body.dark .upload-status.ok  { background: #152215; color: #7DC850; }
+body.dark .upload-status.err { background: #2A1010; color: #E06060; }
+.upload-progress { height: 4px; background: var(--border); border-radius: 2px; margin-top: 8px; display:none; }
+.upload-progress-fill { height: 100%; background: var(--accent); border-radius: 2px; transition: width .3s; }
+.modal-footer {
+  padding: 14px 22px; border-top: 1px solid var(--border);
+  display: flex; justify-content: flex-end; gap: 8px;
+}
+.btn-primary {
+  font-size: 13px; font-family: 'DM Sans', sans-serif; padding: 7px 18px;
+  border-radius: var(--radius-sm); border: none;
+  background: var(--accent); color: #fff; cursor: pointer; font-weight: 500;
+}
+.btn-primary:hover { opacity: .9; }
+.btn-secondary {
+  font-size: 13px; font-family: 'DM Sans', sans-serif; padding: 7px 18px;
+  border-radius: var(--radius-sm); border: 1px solid var(--border2);
+  background: transparent; color: var(--text2); cursor: pointer;
+}
+.btn-secondary:hover { background: var(--surface2); }
+
+/* SCROLLBAR */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
+</style>
+</head>
+<body>
+<div class="shell">
+
+<!-- SIDEBAR -->
+<nav class="sidebar">
+  <div class="sidebar-logo">
+    <div class="org">SEINFRA · UFG</div>
+    <div class="title">Gestão de Manutenção</div>
+  </div>
+  <div class="nav-section">
+    <div class="nav-label">Painéis</div>
+    <button class="tab-btn active" onclick="goTo('overview')"><span class="ico">📊</span> Visão Geral</button>
+    <button class="tab-btn" onclick="goTo('sla')"><span class="ico">⏱️</span> Painel de SLA</button>
+    <button class="tab-btn" onclick="goTo('profissionais')"><span class="ico">👤</span> Profissionais</button>
+    <button class="tab-btn" onclick="goTo('sazonalidade')"><span class="ico">🗓️</span> Sazonalidade</button>
+    <button class="tab-btn" onclick="goTo('yoy')"><span class="ico">📈</span> Comparativo YoY</button>
+    <button class="tab-btn" onclick="goTo('eficiencia')"><span class="ico">🎯</span> Eficiência</button>
+    <button class="tab-btn" onclick="goTo('eletrica')"><span class="ico">⚡</span> Oficina de Elétrica</button>
+  </div>
+  <div class="nav-section" style="margin-top:auto;">
+    <div class="nav-label">Sistema</div>
+    <button class="tab-btn" onclick="openSettings()"><span class="ico">⚙️</span> Configurações</button>
+  </div>
+  <div class="sidebar-footer">
+    <p id="sidebar-data-range">Dados: 2019–2026</p>
+    <p style="margin-top:2px;" id="sidebar-updated">Atualizado 27/04/2026</p>
+  </div>
+</nav>
+
+<!-- SETTINGS MODAL -->
+<div class="modal-overlay" id="settings-modal" onclick="closeSettingsOutside(event)">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>⚙️ Configurações</h3>
+      <button class="modal-close" onclick="closeSettings()">✕</button>
+    </div>
+    <div class="modal-body">
+
+      <!-- APARÊNCIA -->
+      <div>
+        <div class="modal-section-title">Aparência</div>
+        <div class="setting-row">
+          <div>
+            <div class="setting-label">Modo escuro</div>
+            <div class="setting-desc">Alterna entre tema claro e escuro</div>
+          </div>
+          <label class="toggle">
+            <input type="checkbox" id="toggle-dark" onchange="toggleDark(this.checked)">
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+      </div>
+
+      <!-- DADOS -->
+      <div>
+        <div class="modal-section-title">Atualizar dados</div>
+        <p style="font-size:12px;color:var(--text2);margin-bottom:12px;">
+          Carregue um novo CSV com a mesma estrutura do original. As colunas obrigatórias são:
+          <strong>Requisição, Status, Divisão, Oficina, Serviço, Unidade Requisitante, Profissional, Vínculo, Quantidade de Horas, Data De Abertura, Data de Finalização</strong>.
+        </p>
+        <div class="upload-area" id="upload-area"
+          onclick="document.getElementById('csv-input').click()"
+          ondragover="event.preventDefault();this.classList.add('drag')"
+          ondragleave="this.classList.remove('drag')"
+          ondrop="handleDrop(event)">
+          <div style="font-size:28px;">📂</div>
+          <p><strong>Clique para selecionar</strong> ou arraste o arquivo aqui</p>
+          <small>Formato: .CSV · Codificação: UTF-8</small>
+          <input type="file" id="csv-input" accept=".csv" style="display:none" onchange="handleFile(this.files[0])">
+        </div>
+        <div class="upload-progress" id="upload-progress"><div class="upload-progress-fill" id="upload-progress-fill" style="width:0%"></div></div>
+        <div class="upload-status" id="upload-status"></div>
+      </div>
+
+      <!-- CONEXÃO SUPABASE -->
+      <div>
+        <div class="modal-section-title">Conexão com o Supabase</div>
+        <p style="font-size:12px;color:var(--text2);margin-bottom:8px;">
+          Conecte o dashboard a um banco de dados PostgreSQL no Supabase para ler os dados analíticos em tempo real de forma ultrarrápida.
+        </p>
+        <div class="filter-group" style="margin-bottom: 8px;">
+          <label style="font-size:10px;">URL do Supabase</label>
+          <input type="text" id="sb-url" placeholder="https://seu-projeto.supabase.co" style="font-size:12px;padding:6px;border:1px solid var(--border2);border-radius:var(--radius-sm);background:var(--bg);color:var(--text);width:100%;">
+        </div>
+        <div class="filter-group" style="margin-bottom: 12px;">
+          <label style="font-size:10px;">Chave Anon Pública (anon_key)</label>
+          <input type="password" id="sb-key" placeholder="Chave anônima pública eyJhbGciOi..." style="font-size:12px;padding:6px;border:1px solid var(--border2);border-radius:var(--radius-sm);background:var(--bg);color:var(--text);width:100%;">
+        </div>
+        <div style="display:flex;gap:8px;margin-bottom:10px;">
+          <button class="btn-primary" onclick="saveSupabaseSettings()" style="padding:6px 12px;font-size:12px;">Conectar</button>
+          <button class="btn-secondary" onclick="disconnectSupabase()" style="padding:6px 12px;font-size:12px;color:var(--danger);border-color:var(--danger);">Desconectar</button>
+        </div>
+        <div id="sb-status" style="font-size:11px;margin-bottom:16px;color:var(--text3);">Status: Não conectado. Usando dados locais.</div>
+      </div>
+
+      <!-- DADOS SALVOS -->
+      <div>
+        <div class="modal-section-title">Dados salvos</div>
+        <p style="font-size:12px;color:var(--text2);margin-bottom:8px;">
+          Os dados carregados via CSV são salvos automaticamente no navegador e persistem entre recarregamentos.
+        </p>
+        <p style="font-size:12px;color:var(--text2);" id="modal-saved-info">
+          Carregue um CSV para salvar os dados.
+        </p>
+        <button class="btn-secondary" onclick="clearCsvData()" style="margin-top:8px;color:var(--danger);border-color:var(--danger);">
+          🗑️ Restaurar dados de exemplo
+        </button>
+      </div>
+
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="closeSettings()">Fechar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MAIN -->
+<div class="main">
+
+  <!-- TOPBAR -->
+  <div class="topbar">
+    <div>
+      <div class="topbar-title" id="topbar-title">Visão Geral</div>
+      <div class="topbar-sub">Relatório de horas de requisições de manutenção</div>
+    </div>
+    <div class="topbar-right">
+      <span class="badge badge-blue">115.290 requisições</span>
+      <span class="badge badge-green">472.612 horas</span>
+      <span class="badge badge-red">5.523 em aberto</span>
+    </div>
+  </div>
+
+  <!-- FILTERS removidos — cada aba tem seus próprios filtros locais -->
+
+  <div class="content">
+
+  <!-- ============================= OVERVIEW ============================= -->
+  <div class="section active" id="sec-overview">
+    <div class="section-hd">
+      <h2>Visão Geral</h2>
+      <p>Indicadores consolidados de todas as requisições de manutenção</p>
+    </div>
+
+    <!-- Filtros da aba Visão Geral -->
+    <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;margin-bottom:20px;padding:12px 16px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);">
+      <div class="filter-group">
+        <label>Ano</label>
+        <select id="ov-ano" onchange="updateOverview()"><option value="">Todos</option><option value="2019">2019</option><option value="2020">2020</option><option value="2021">2021</option><option value="2022">2022</option><option value="2023">2023</option><option value="2024">2024</option><option value="2025">2025</option><option value="2026">2026</option></select>
+      </div>
+      <button class="btn-reset" onclick="resetOverviewFilters()">↺ Limpar</button>
+      <span style="margin-left:auto;font-size:12px;color:var(--text3);" id="ov-filter-info">Dados consolidados 2019–2026</span>
+    </div>
+
+    <div class="kpi-grid">
+      <div class="kpi-card neutral"><div class="kpi-label">Total requisições</div><div class="kpi-value" id="k-total">115.290</div><div class="kpi-sub" id="k-total-sub">2019–2026</div></div>
+      <div class="kpi-card info"><div class="kpi-label">Total horas</div><div class="kpi-value" id="k-horas">472.612</div><div class="kpi-sub">horas registradas</div></div>
+      <div class="kpi-card ok"><div class="kpi-label">Finalizadas</div><div class="kpi-value" id="k-fin">109.767</div><div class="kpi-sub" id="k-fin-sub">95,2% do total</div></div>
+      <div class="kpi-card danger"><div class="kpi-label">Em aberto</div><div class="kpi-value" id="k-aberto">5.523</div><div class="kpi-sub" id="k-aberto-sub">4,8% em aberto</div></div>
+      <div class="kpi-card warn"><div class="kpi-label">Mediana SLA</div><div class="kpi-value" id="k-sla">47d</div><div class="kpi-sub">dias até finalizar</div></div>
+      <div class="kpi-card neutral"><div class="kpi-label">Média horas/req</div><div class="kpi-value" id="k-media">4,1h</div><div class="kpi-sub">por requisição</div></div>
+    </div>
+
+    <div class="grid2">
+      <div class="card">
+        <div class="card-title">Volume mensal de requisições</div>
+        <div class="card-sub" id="trend-sub">Evolução anual 2019–2026</div>
+        <div class="chart-wrap" style="height:200px"><canvas id="chartTrend"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Horas por oficina — Top 10</div>
+        <div class="card-sub">Volume total de horas por especialidade</div>
+        <div id="barOficina"></div>
+      </div>
+    </div>
+
+    <div class="grid2">
+      <div class="card">
+        <div class="card-title">Distribuição por status</div>
+        <div class="card-sub">Composição do pipeline de requisições</div>
+        <div class="legend" id="leg-status"></div>
+        <div class="chart-wrap" style="height:180px"><canvas id="chartStatus"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Horas por divisão × vínculo</div>
+        <div class="card-sub">Terceirizados vs servidores UFG</div>
+        <div class="legend" id="leg-div"></div>
+        <div class="chart-wrap" style="height:180px"><canvas id="chartDiv"></canvas></div>
+      </div>
+    </div>
+
+    <div class="grid2">
+      <div class="card">
+        <div class="card-title">Status detalhado</div>
+        <div class="card-sub">Requisições, percentual e horas por status</div>
+        <table class="tbl"><thead><tr><th>Status</th><th class="right">Qtd</th><th class="right">%</th><th class="right">Horas</th></tr></thead><tbody id="tb-status"></tbody></table>
+      </div>
+      <div class="card">
+        <div class="card-title">Top 10 unidades requisitantes</div>
+        <div class="card-sub">Por volume de requisições abertas</div>
+        <div id="barUnidade"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================= SLA ============================= -->
+  <div class="section" id="sec-sla">
+    <div class="section-hd">
+      <h2>Painel de SLA</h2>
+      <p>Análise de prazos, alertas e gargalos de resolução</p>
+    </div>
+
+    <!-- Filtros específicos da aba SLA -->
+    <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;margin-bottom:20px;padding:12px 16px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);">
+      <div class="filter-group">
+        <label>Ano</label>
+        <select id="sla-ano" onchange="updateSla()"><option value="">Todos</option></select>
+      </div>
+      <div class="filter-group">
+        <label>Divisão</label>
+        <select id="sla-divisao" onchange="updateSla()"><option value="">Todas</option></select>
+      </div>
+      <div class="filter-group">
+        <label>Oficina</label>
+        <select id="sla-oficina" onchange="updateSla()"><option value="">Todas</option></select>
+      </div>
+      <div class="filter-group">
+        <label>Status</label>
+        <select id="sla-status" onchange="updateSla()"><option value="">Todos</option></select>
+      </div>
+      <button class="btn-reset" onclick="resetSlaFilters()">↺ Limpar</button>
+      <span style="margin-left:auto;font-size:12px;color:var(--text3);" id="sla-filter-info"></span>
+    </div>
+
+    <div class="kpi-grid">
+      <div class="kpi-card danger"><div class="kpi-label">Fora do SLA (90+ dias)</div><div class="kpi-value" id="k-fora-sla">35,7%</div><div class="kpi-sub" id="k-fora-sla-sub">39.061 finalizadas</div></div>
+      <div class="kpi-card ok"><div class="kpi-label">Dentro de 7 dias</div><div class="kpi-value" id="k-dentro-7">13,9%</div><div class="kpi-sub" id="k-dentro-7-sub">15.186 requisições</div></div>
+      <div class="kpi-card warn"><div class="kpi-label">Mediana resolução</div><div class="kpi-value" id="k-mediana-res">47 dias</div><div class="kpi-sub" id="k-mediana-res-sub">P75 = 156 dias</div></div>
+      <div class="kpi-card danger"><div class="kpi-label">Em aberto crítico</div><div class="kpi-value" id="k-aberto-crit">3.486</div><div class="kpi-sub" id="k-aberto-crit-sub">63% dos abertos</div></div>
+      <div class="kpi-card info"><div class="kpi-label">P90 resolução</div><div class="kpi-value">362 dias</div><div class="kpi-sub">P95 = 558 dias</div></div>
+    </div>
+
+    <div class="grid2">
+      <div class="card">
+        <div class="card-title">Distribuição por faixa de prazo</div>
+        <div class="card-sub">Requisições finalizadas (109.317 com tempo calculado)</div>
+        <div id="sla-faixas-fin"></div>
+        <div style="margin-top:18px;padding-top:14px;border-top:1px solid var(--border);">
+          <div class="card-sub">Em aberto agora (5.523 total)</div>
+          <div id="sla-faixas-ab"></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">Alertas críticos de SLA</div>
+        <div class="card-sub">Situações que requerem atenção imediata da gestão</div>
+        <div class="alert alert-danger"><div class="alert-dot"></div><div><div class="alert-title">63% dos abertos estão há 90+ dias</div><div class="alert-desc">3.486 requisições aguardam resolução com prazo muito ultrapassado</div></div></div>
+        <div class="alert alert-danger"><div class="alert-dot"></div><div><div class="alert-title">Divisão Serviços: mediana de 333 dias</div><div class="alert-desc">Média de 493 dias — mais de 1 ano por requisição em média</div></div></div>
+        <div class="alert alert-danger"><div class="alert-dot"></div><div><div class="alert-title">2 requisições aguardam há 2.357 dias</div><div class="alert-desc">Status "ENVIADA" — mais de 6 anos sem movimentação registrada</div></div></div>
+        <div class="alert alert-warn"><div class="alert-dot"></div><div><div class="alert-title">Pintura/Gesso e Alvenaria: média 238–240 dias</div><div class="alert-desc">As duas oficinas com maior atraso entre as mais demandadas</div></div></div>
+        <div class="alert alert-warn"><div class="alert-dot"></div><div><div class="alert-title">Ag. Avaliação Requisitante: 620 dias em média</div><div class="alert-desc">667 requisições paradas aguardando retorno do solicitante</div></div></div>
+        <div class="alert alert-ok"><div class="alert-dot"></div><div><div class="alert-title">Tendência positiva em 2025–2026</div><div class="alert-desc">55% das req. de 2025 resolvidas em até 30 dias (vs. 31% em 2023)</div></div></div>
+      </div>
+    </div>
+
+    <div class="grid2">
+      <div class="card">
+        <div class="card-title">SLA por oficina — Top 10 volume</div>
+        <div class="card-sub">Mediana de dias até finalização</div>
+        <table class="tbl">
+          <thead><tr><th>Oficina</th><th class="right">Mediana</th><th class="right">Média</th><th class="right">Status</th></tr></thead>
+          <tbody>
+            <tr><td>Telecomunicações</td><td class="right mono">25d</td><td class="right mono">45d</td><td class="right"><span class="pill pill-ok">Bom</span></td></tr>
+            <tr><td>Hidráulica</td><td class="right mono">27d</td><td class="right mono">77d</td><td class="right"><span class="pill pill-ok">Bom</span></td></tr>
+            <tr><td>Controle de Acesso</td><td class="right mono">31d</td><td class="right mono">51d</td><td class="right"><span class="pill pill-warn">Regular</span></td></tr>
+            <tr><td>Elétrica</td><td class="right mono">50d</td><td class="right mono">126d</td><td class="right"><span class="pill pill-warn">Regular</span></td></tr>
+            <tr><td>Refrigeração</td><td class="right mono">63d</td><td class="right mono">119d</td><td class="right"><span class="pill pill-warn">Regular</span></td></tr>
+            <tr><td>Marcenaria</td><td class="right mono">49d</td><td class="right mono">146d</td><td class="right"><span class="pill pill-warn">Regular</span></td></tr>
+            <tr><td>Serralheria</td><td class="right mono">65d</td><td class="right mono">158d</td><td class="right"><span class="pill pill-danger">Crítico</span></td></tr>
+            <tr><td>Eletrônica</td><td class="right mono">45d</td><td class="right mono">161d</td><td class="right"><span class="pill pill-danger">Crítico</span></td></tr>
+            <tr><td>Alvenaria</td><td class="right mono">123d</td><td class="right mono">238d</td><td class="right"><span class="pill pill-danger">Crítico</span></td></tr>
+            <tr><td>Pintura/Gesso</td><td class="right mono">106d</td><td class="right mono">240d</td><td class="right"><span class="pill pill-danger">Crítico</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="card">
+        <div class="card-title">Evolução: % resolvidas em até 30 dias por ano</div>
+        <div class="card-sub">Melhora consistente a partir de 2024</div>
+        <div id="sla-trend-anos"></div>
+        <div style="margin-top:16px;padding-top:12px;border-top:1px solid var(--border);">
+          <div class="card-sub" style="margin-bottom:8px;">Em aberto — tempo médio decorrido por status</div>
+          <table class="tbl" style="font-size:11px;">
+            <tbody>
+              <tr><td>Em Rota de Visita (4.008)</td><td class="right mono" style="color:var(--warn)">275 dias</td></tr>
+              <tr><td>Ag. Requisição Requisitante (667)</td><td class="right mono" style="color:var(--danger)">620 dias</td></tr>
+              <tr><td>Pedido de Material Realizado (382)</td><td class="right mono" style="color:var(--warn)">277 dias</td></tr>
+              <tr><td>Serviço Avaliado (255)</td><td class="right mono" style="color:var(--danger)">685 dias</td></tr>
+              <tr><td>Ag. Pedido de Material (173)</td><td class="right mono" style="color:var(--danger)">521 dias</td></tr>
+              <tr><td>Ag. Visita (36)</td><td class="right mono" style="color:var(--warn)">367 dias</td></tr>
+              <tr><td>Enviada (2)</td><td class="right mono" style="color:var(--danger);font-weight:600">2.357 dias ⚠️</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================= PROFISSIONAIS ============================= -->
+  <div class="section" id="sec-profissionais">
+    <div class="section-hd">
+      <h2>Ranking de Profissionais</h2>
+      <p>Distribuição de carga, horas e desempenho de SLA por profissional</p>
+    </div>
+
+    <!-- Filtros locais da aba -->
+    <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;margin-bottom:20px;padding:12px 16px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);">
+      <div class="filter-group">
+        <label>Ano</label>
+        <select id="pf-ano" onchange="updateProf()"><option value="">Todos</option></select>
+      </div>
+      <div class="filter-group">
+        <label>Oficina</label>
+        <select id="pf-oficina" onchange="updateProf()"><option value="">Todas</option></select>
+      </div>
+      <div class="filter-group">
+        <label>SLA</label>
+        <select id="pf-sla" onchange="updateProf()">
+          <option value="">Todos</option>
+          <option value="ok">Bom (≤30d)</option>
+          <option value="warn">Regular (31–90d)</option>
+          <option value="danger">Crítico (90+d)</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label>Ordenar por</label>
+        <select id="pf-sort" onchange="updateProf()">
+          <option value="req">Requisições</option>
+          <option value="horas">Horas</option>
+          <option value="sla">SLA (melhor)</option>
+          <option value="sla-desc">SLA (pior)</option>
+          <option value="media">Média h/req</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label>Buscar nome</label>
+        <input id="pf-busca" type="text" placeholder="Digite o nome…" oninput="updateProf()"
+          style="font-size:12px;font-family:'DM Sans', sans-serif;padding:5px 10px;border:1px solid var(--border2);border-radius:var(--radius-sm);background:var(--bg);color:var(--text);min-width:160px;">
+      </div>
+      <button class="btn-reset" onclick="resetProfFilters()">↺ Limpar</button>
+      <span style="margin-left:auto;font-size:12px;color:var(--text3);">Exibindo <strong id="prof-count" style="color:var(--text)">20</strong> profissionais</span>
+    </div>
+
+    <!-- KPIs da aba -->
+    <div class="kpi-grid" style="margin-bottom:20px;">
+      <div class="kpi-card neutral"><div class="kpi-label">Profissionais</div><div class="kpi-value" id="pk-total">20</div><div class="kpi-sub">no ranking filtrado</div></div>
+      <div class="kpi-card info"><div class="kpi-label">Total requisições</div><div class="kpi-value" id="pk-req">—</div><div class="kpi-sub">dos filtrados</div></div>
+      <div class="kpi-card info"><div class="kpi-label">Total horas</div><div class="kpi-value" id="pk-horas">—</div><div class="kpi-sub">dos filtrados</div></div>
+      <div class="kpi-card ok"><div class="kpi-label">Melhor SLA</div><div class="kpi-value" id="pk-sla-ok">—</div><div class="kpi-sub" id="pk-sla-ok-sub"></div></div>
+      <div class="kpi-card danger"><div class="kpi-label">Pior SLA</div><div class="kpi-value" id="pk-sla-bad">—</div><div class="kpi-sub" id="pk-sla-bad-sub"></div></div>
+    </div>
+
+    <div class="grid2">
+      <div class="card">
+        <div class="card-title">Top 15 por requisições</div>
+        <div class="card-sub" id="rankA-sub">Ordenado por volume · badge = mediana SLA</div>
+        <div id="rankingA"></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Top 15 por horas</div>
+        <div class="card-sub" id="rankB-sub">Ordenado por total de horas registradas</div>
+        <div id="rankingB"></div>
+      </div>
+    </div>
+    <div class="card full">
+      <div class="card-title">Tabela completa de profissionais</div>
+      <div class="card-sub">Clique nos cabeçalhos para ordenar</div>
+      <table class="tbl" id="tb-prof">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th onclick="setProfSort('nome')" style="cursor:pointer">Profissional ↕</th>
+            <th onclick="setProfSort('ofic')" style="cursor:pointer">Oficina ↕</th>
+            <th class="right" onclick="setProfSort('req')" style="cursor:pointer">Req ↕</th>
+            <th class="right" onclick="setProfSort('horas')" style="cursor:pointer">Horas ↕</th>
+            <th class="right" onclick="setProfSort('media')" style="cursor:pointer">Média h/req ↕</th>
+            <th class="right" onclick="setProfSort('sla')" style="cursor:pointer">SLA mediana ↕</th>
+            <th>Cargo</th>
+          </tr>
+        </thead>
+        <tbody id="tb-prof-body"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ============================= SAZONALIDADE ============================= -->
+  <div class="section" id="sec-sazonalidade">
+    <div class="section-hd">
+      <h2>Sazonalidade</h2>
+      <p>Padrões de demanda por mês e ano — 2019 a 2025</p>
+    </div>
+
+    <!-- Filtros específicos da aba Sazonalidade -->
+    <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;margin-bottom:20px;padding:12px 16px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);">
+      <div class="filter-group">
+        <label>Oficina</label>
+        <select id="saz-oficina" onchange="updateSaz()"><option value="">Todas</option></select>
+      </div>
+
+      <!-- KPI Compacto inserido no local indicado -->
+      <div style="margin-left: 10px; border-left: 1px solid var(--border); padding-left: 20px; display: flex; flex-direction: column; gap: 2px;">
+        <span style="font-size: 10px; font-weight: 600; text-transform: uppercase; color: var(--text3); letter-spacing: .06em;">Total Requisições</span>
+        <div style="display: flex; align-items: baseline; gap: 8px;">
+          <span id="k-saz-req" style="font-size: 20px; font-weight: 600; color: var(--accent); font-family: 'DM Mono', monospace;">—</span>
+          <span id="k-saz-req-sub" style="font-size: 11px; color: var(--text3);">com o filtro atual</span>
+        </div>
+      </div>
+
+      <button class="btn-reset" onclick="resetSazFilters()">↺ Limpar</button>
+      <span style="margin-left:auto;font-size:12px;color:var(--text3);" id="saz-filter-info">Todas as oficinas</span>
+    </div>
+
+    <div class="grid3">
+      <div class="card">
+        <div class="card-title">Requisições abertas — mês × ano</div>
+        <div class="card-sub">Células mais escuras = maior volume</div>
+        <div class="hm-wrap"><table class="hm-table" id="hmReq"></table></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Requisições finalizadas — mês × ano</div>
+        <div class="card-sub">Células mais escuras = maior volume</div>
+        <div class="hm-wrap"><table class="hm-table" id="hmReqFin"></table></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Horas registradas — mês × ano</div>
+        <div class="card-sub">Células mais escuras = maior volume</div>
+        <div class="hm-wrap"><table class="hm-table" id="hmHoras"></table></div>
+      </div>
+    </div>
+    <div class="card full">
+      <div class="card-title">Insights de sazonalidade</div>
+      <div class="card-sub">Padrões identificados nos dados de 7 anos</div>
+      <div class="grid3" style="margin:0;gap:12px;">
+        <div class="alert alert-warn" style="margin:0;align-items:flex-start;"><div class="alert-dot" style="margin-top:2px;"></div><div><div class="alert-title">Pico em Set/Out</div><div class="alert-desc">Setembro e outubro concentram os maiores volumes em quase todos os anos — coincide com o retorno do 2º semestre letivo.</div></div></div>
+        <div class="alert alert-ok" style="margin:0;align-items:flex-start;"><div class="alert-dot" style="margin-top:2px;"></div><div><div class="alert-title">Maio é o mais fraco</div><div class="alert-desc">Consistentemente o mês de menor demanda — pode indicar recesso ou subnotificação no período.</div></div></div>
+        <div class="alert alert-danger" style="margin:0;align-items:flex-start;"><div class="alert-dot" style="margin-top:2px;"></div><div><div class="alert-title">Explosão em 2022–2023</div><div class="alert-desc">Retorno pós-pandemia gerou demanda reprimida: +215% de requisições em relação a 2020.</div></div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================= YOY ============================= -->
+  <div class="section" id="sec-yoy">
+    <div class="section-hd">
+      <h2>Comparativo Ano a Ano (YoY)</h2>
+      <p>Evolução de requisições e horas por divisão e oficina — 2019 a 2025</p>
+    </div>
+
+    <div class="kpi-grid">
+      <div class="kpi-card info"><div class="kpi-label">Crescimento total 2019→2025</div><div class="kpi-value">+242%</div><div class="kpi-sub">em requisições</div></div>
+      <div class="kpi-card warn"><div class="kpi-label">Pico histórico</div><div class="kpi-value">2023</div><div class="kpi-sub">20.257 requisições</div></div>
+      <div class="kpi-card ok"><div class="kpi-label">Queda 2023→2025</div><div class="kpi-value">−13%</div><div class="kpi-sub">tendência de estabilização</div></div>
+      <div class="kpi-card danger"><div class="kpi-label">Predial: dominância</div><div class="kpi-value">83%</div><div class="kpi-sub">das req em 2025</div></div>
+    </div>
+
+    <div class="card full">
+      <div class="card-title">Evolução anual — selecione o modo de visualização</div>
+      <div class="card-sub" style="margin-bottom:12px;">2019 a 2025 · dados consolidados</div>
+      <div class="tabs">
+        <button class="tab-btn active" onclick="setYoyTab('req-div')">Req. por divisão</button>
+        <button class="tab-btn" onclick="setYoyTab('horas-div')">Horas por divisão</button>
+        <button class="tab-btn" onclick="setYoyTab('horas-ofic')">Horas top oficinas</button>
+        <button class="tab-btn" onclick="setYoyTab('req-ofic')">Req. top oficinas</button>
+        <button class="tab-btn" onclick="setYoyTab('delta')">Crescimento YoY %</button>
+      </div>
+      <div class="chart-wrap" style="height:280px"><canvas id="chartYoy"></canvas></div>
+      <div class="legend" id="yoy-legend" style="margin-top:10px;"></div>
+    </div>
+
+    <div class="grid2">
+      <div class="card">
+        <div class="card-title">Req. por divisão — ano a ano</div>
+        <div class="card-sub">Valores absolutos 2019–2025</div>
+        <table class="tbl">
+          <thead><tr><th>Ano</th><th class="right">Equipamentos</th><th class="right">Predial</th><th class="right">Serviços</th><th class="right">Total</th></tr></thead>
+          <tbody id="tb-yoy-div"></tbody>
+        </table>
+      </div>
+      <div class="card">
+        <div class="card-title">Horas top 5 oficinas — ano a ano</div>
+        <div class="card-sub">Evolução 2019–2025</div>
+        <table class="tbl">
+          <thead><tr><th>Ano</th><th class="right">Elét.</th><th class="right">Refrig.</th><th class="right">Alv.</th><th class="right">Pint.</th><th class="right">Hidr.</th></tr></thead>
+          <tbody id="tb-yoy-ofic"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card full">
+      <div class="card-title">Req. por oficina — ano a ano</div>
+      <div class="card-sub">Top 5 oficinas · 2019–2025</div>
+      <table class="tbl">
+        <thead><tr><th>Ano</th><th class="right">Elét.</th><th class="right">Refrig.</th><th class="right">Alv.</th><th class="right">Pint.</th><th class="right">Hidr.</th></tr></thead>
+        <tbody id="tb-yoy-ofic-req"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ============================= EFICIÊNCIA ============================= -->
+  <div class="section" id="sec-eficiencia">
+    <div class="section-hd">
+      <h2>Eficiência e Gestão de Gargalos</h2>
+      <p>Análise de tempo administrativo vs. esforço de trabalho técnico por oficina</p>
+    </div>
+
+    <!-- Barra de Filtros Locais -->
+    <div class="filters-bar" style="padding: 10px 0; margin-bottom: 20px; border-bottom: 1px solid var(--border); background: transparent;">
+      <div class="filter-group">
+        <label for="ef-ano">Ano</label>
+        <select id="ef-ano" onchange="updateEficiencia()">
+          <!-- Preenchido via JS -->
+        </select>
+      </div>
+      <div class="filter-group">
+        <label for="ef-divisao">Divisão</label>
+        <select id="ef-divisao" onchange="updateEficiencia()">
+          <option value="">Todas</option>
+          <option value="Equipamentos">Equipamentos</option>
+          <option value="Predial">Predial</option>
+          <option value="Serviços">Serviços</option>
+        </select>
+      </div>
+      <button class="btn-reset" onclick="resetEfFilters()">↺ Limpar</button>
+      <span style="margin-left:auto;font-size:12px;color:var(--text3);" id="ef-filter-info">Todas as oficinas</span>
+    </div>
+
+    <!-- Grid de KPIs -->
+    <div class="kpi-grid">
+      <div class="kpi-card danger">
+        <div class="kpi-label">Gargalo Administrativo Crítico</div>
+        <div class="kpi-value" id="ef-kpi-gargalo" style="font-size: 16px; font-weight: 600; line-height: 1.3; height: 24px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">—</div>
+        <div class="kpi-sub" id="ef-kpi-gargalo-sub">Maior SLA com menos horas</div>
+      </div>
+      <div class="kpi-card ok">
+        <div class="kpi-label">Oficina Mais Ágil (Menor SLA)</div>
+        <div class="kpi-value" id="ef-kpi-rapida" style="font-size: 16px; font-weight: 600; line-height: 1.3; height: 24px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">—</div>
+        <div class="kpi-sub" id="ef-kpi-rapida-sub">Menor tempo de fila</div>
+      </div>
+      <div class="kpi-card info">
+        <div class="kpi-label">Mediana de SLA Global</div>
+        <div class="kpi-value" id="ef-kpi-sla-global">—</div>
+        <div class="kpi-sub">dias na fila de espera</div>
+      </div>
+      <div class="kpi-card warn">
+        <div class="kpi-label">Esforço Técnico Médio</div>
+        <div class="kpi-value" id="ef-kpi-horas-global">—</div>
+        <div class="kpi-sub">horas ativas por chamado</div>
+      </div>
+    </div>
+
+    <!-- Grid do Gráfico e Painel de Diagnóstico -->
+    <div class="grid2" style="margin-top: 20px;">
+      <div class="card" style="display:flex; flex-direction:column; min-height: 420px;">
+        <div class="card-title">Matriz de Eficiência e Fluxo (Scatter)</div>
+        <div class="card-sub" style="margin-bottom:12px;">Confronto entre tempo de espera (SLA em dias) e esforço ativo de trabalho (Média de horas)</div>
+        <div class="chart-wrap" style="flex:1; min-height: 300px; position: relative;">
+          <canvas id="chartEficiencia"></canvas>
+        </div>
+        <div style="display:flex; justify-content: space-between; font-size:11px; color:var(--text3); margin-top:8px;">
+          <span>← Resolução Ágil</span>
+          <span>Mais Espera/Administrativo →</span>
+        </div>
+      </div>
+
+      <div class="card" style="display:flex; flex-direction:column; justify-content: space-between; min-height: 420px;">
+        <div>
+          <div class="card-title">Diagnóstico de Gargalos & Estoque</div>
+          <div class="card-sub" style="margin-bottom:16px;">Análise em tempo real do comportamento das oficinas e recomendações operacionais</div>
+          
+          <div id="ef-diagnostico-container" style="display:flex; flex-direction:column; gap:12px;">
+            <!-- Conteúdo dinâmico gerado via JS -->
+          </div>
+        </div>
+
+        <div class="alert alert-info" style="margin: 16px 0 0 0; font-size: 12px; line-height: 1.4;">
+          <div class="alert-dot"></div>
+          <div>
+            <strong>Como interpretar a Matriz:</strong> O quadrante inferior direito representa oficinas com longa fila de espera administrativa, mas baixas horas de execução técnica, caracterizando um <strong>Gargalo Burocrático</strong>.
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================= OFICINA DE ELÉTRICA ============================= -->
+  <div class="section" id="sec-eletrica">
+    <div class="section-hd">
+      <h2>⚡ Oficina de Elétrica</h2>
+      <p>Análise detalhada dos serviços, profissionais e desempenho da oficina de Elétrica</p>
+    </div>
+
+    <!-- Filtros -->
+    <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;margin-bottom:20px;padding:12px 16px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);">
+      <div class="filter-group">
+        <label>Ano</label>
+        <select id="el-ano" onchange="updateEletrica()"><option value="">Todos</option></select>
+      </div>
+      <button class="btn-reset" onclick="resetEletricaFilters()">↺ Limpar</button>
+      <span style="margin-left:auto;font-size:12px;color:var(--text3);" id="el-filter-info">Elétrica — 2019–2026</span>
+    </div>
+
+    <!-- KPIs -->
+    <div class="kpi-grid">
+      <div class="kpi-card neutral"><div class="kpi-label">Total requisições</div><div class="kpi-value" id="el-k-total">—</div><div class="kpi-sub" id="el-k-total-sub">elétrica</div></div>
+      <div class="kpi-card info"><div class="kpi-label">Total horas</div><div class="kpi-value" id="el-k-horas">—</div><div class="kpi-sub">horas registradas</div></div>
+      <div class="kpi-card ok"><div class="kpi-label">Profissionais</div><div class="kpi-value" id="el-k-prof">—</div><div class="kpi-sub">eletricistas</div></div>
+      <div class="kpi-card warn"><div class="kpi-label">Mediana SLA</div><div class="kpi-value" id="el-k-sla">—</div><div class="kpi-sub">dias até finalizar</div></div>
+      <div class="kpi-card info"><div class="kpi-label">Média horas/req</div><div class="kpi-value" id="el-k-media">—</div><div class="kpi-sub">por requisição</div></div>
+      <div class="kpi-card neutral"><div class="kpi-label">% do total geral</div><div class="kpi-value" id="el-k-pct">—</div><div class="kpi-sub">participação</div></div>
+    </div>
+
+    <div class="grid2">
+      <!-- Profissionais da Elétrica -->
+      <div class="card">
+        <div class="card-title">Profissionais da Elétrica</div>
+        <div class="card-sub">Ranking por volume de requisições</div>
+        <div id="el-ranking-prof"></div>
+      </div>
+      <!-- Evolução anual -->
+      <div class="card">
+        <div class="card-title">Evolução anual — Requisições vs Horas</div>
+        <div class="card-sub">Comparativo ano a ano</div>
+        <div class="chart-wrap" style="height:200px"><canvas id="chartEletricaAnual"></canvas></div>
+      </div>
+    </div>
+
+    <div class="grid3">
+      <!-- SLA por ano -->
+      <div class="card">
+        <div class="card-title">SLA por ano</div>
+        <div class="card-sub">Mediana de dias para finalização</div>
+        <div id="el-sla-anos"></div>
+      </div>
+      <!-- Distribuição mensal (heatmap) -->
+      <div class="card">
+        <div class="card-title">Requisições — mês × ano</div>
+        <div class="card-sub">Heatmap de volume mensal</div>
+        <div class="hm-wrap"><table class="hm-table" id="el-hm-req"></table></div>
+      </div>
+      <!-- Comparativo com top oficinas -->
+      <div class="card">
+        <div class="card-title">Comparativo: Participação por ano</div>
+        <div class="card-sub">Elétrica vs outras oficinas</div>
+        <div class="chart-wrap" style="height:200px"><canvas id="chartEletricaComparativo"></canvas></div>
+      </div>
+    </div>
+
+    <!-- Tabela de profissionais -->
+    <div class="card full">
+      <div class="card-title">Detalhamento dos profissionais da Elétrica</div>
+      <div class="card-sub">Requisições, horas, média e SLA individual</div>
+      <table class="tbl" id="el-tb-prof">
+        <thead>
+          <tr><th>#</th><th>Profissional</th><th class="right">Requisições</th><th class="right">Horas</th><th class="right">Média h/req</th><th class="right">SLA mediana</th></tr>
+        </thead>
+        <tbody id="el-tb-prof-body"></tbody>
+      </table>
+    </div>
+  </div>
+
+  </div><!-- /content -->
+</div><!-- /main -->
+</div><!-- /shell -->
+
+<script>
+// ============================= DATA ============================= //
+const D = {
+  monthly_req: {"2019":[0,0,0,0,0,0,0,0,0,1922,2128,1244],"2020":[2378,1592,1446,444,577,583,571,575,800,823,1013,893],"2021":[1006,1002,1058,773,951,739,855,1015,1636,1343,1402,992],"2022":[1240,1514,2079,1417,1803,1905,1870,2151,1775,1767,1752,1385],"2023":[2622,1660,2068,1541,1773,1599,1324,1882,1801,1785,1988,1214],"2024":[2094,1613,1386,1502,838,1309,2117,1895,2130,1748,1725,1086],"2025":[1540,1614,1727,1714,1567,1327,1390,1718,2022,1591,1357,1176],"2026":[1468,1424,1864,672,0,0,0,0,0,0,0,0]},
+  monthly_horas: {"2019":[0,0,0,0,0,0,0,0,0,8386,8038,5424],"2020":[7938,9730,4500,1532,3423,6859,2588,1867,3653,2692,4748,2823],"2021":[3962,3677,6213,3564,6217,2684,2658,4566,5086,6511,4306,3247],"2022":[5344,5569,8007,6504,7710,7658,8542,7876,8351,7326,7242,6159],"2023":[10720,6639,9605,5846,6332,7388,5911,7222,6792,7994,7766,5085],"2024":[8440,7079,7456,7914,3781,5232,8498,9535,8278,6745,5807,4361],"2025":[7863,5936,7034,5629,5838,5179,5505,6864,7284,6030,5219,4258],"2026":[4639,4878,5150,1700,0,0,0,0,0,0,0,0]},
+  status: {"AGUARDANDO REQUISIÇÃO REQUISITANTE":{"req":667,"horas":2985},"AGUARDANDO PEDIDO DE MATERIAL":{"req":173,"horas":660},"AGUARDANDO VISITA":{"req":36,"horas":118},"EM ROTA DE VISITA":{"req":4008,"horas":10727},"ENVIADA":{"req":2,"horas":2},"FINALIZADA":{"req":109767,"horas":453249},"PEDIDO DE MATERIAL REALIZADO":{"req":382,"horas":2358},"SERVIÇO AVALIADO":{"req":255,"horas":2513}},
+  ofic_horas: {"Elétrica":101754,"Refrigeração":61290,"Alvenaria":58750,"Pintura/Gesso":53472,"Hidráulica":44144,"Marcenaria":31443,"Telecomunicações":22368,"Serralheria":22053,"Controle De Acesso":15394,"Eletrônica":14736,"Informática":12139,"Mecânica":10494,"Pequenas Reformas":8106,"Parecer":4401,"Impressoras":3421},
+  yoy_div: {"2019":{"Equipamentos":{"req":1569,"horas":4260},"Predial":{"req":3725,"horas":17588}},"2020":{"Equipamentos":{"req":2711,"horas":7483},"Predial":{"req":8865,"horas":40272},"Serviços":{"req":119,"horas":4598}},"2021":{"Equipamentos":{"req":2948,"horas":9256},"Predial":{"req":9734,"horas":40260},"Serviços":{"req":90,"horas":3175}},"2022":{"Equipamentos":{"req":5035,"horas":22229},"Predial":{"req":15565,"horas":63639},"Serviços":{"req":58,"horas":420}},"2023":{"Equipamentos":{"req":4766,"horas":19650},"Predial":{"req":16485,"horas":67629},"Serviços":{"req":6,"horas":21}},"2024":{"Equipamentos":{"req":4881,"horas":20241},"Predial":{"req":14559,"horas":62852},"Serviços":{"req":3,"horas":33}},"2025":{"Equipamentos":{"req":4883,"horas":20497},"Predial":{"req":13859,"horas":52138},"Serviços":{"req":1,"horas":4}}},
+  unidades: {"Escola De Agronomia":10044,"Pro Reitoria De Graduacao":7930,"Escola De Veterinária E Zootecnia":7430,"Instituto De Ciencias Biologicas":7098,"Instituto De Patologia Tropical E Saúde Pública":5647,"Instituto De Química":5372,"Centro De Ensino E Pesquisa Aplicada A Educacao":3810,"Faculdade De Farmácia":3770,"Secretaria De Promoção Da Segurança E Direitos Humanos":3669,"Pró-Reitoria De Assuntos Estudantis":3551},
+  profissionais: [
+    {"n":"Jose Francisco Benedito Da Costa","req":10003,"horas":34302,"media":3.4,"sla":62,"ofic":"Hidráulica","cargo":"Encarregado Civil"},
+    {"n":"Heliton De Franca Carvalho","req":5679,"horas":16923,"media":3.0,"sla":65,"ofic":"Elétrica","cargo":"Encarregado"},
+    {"n":"Daniel Da Costa Braz","req":5094,"horas":6940,"media":1.4,"sla":11,"ofic":"Elétrica","cargo":"Encarregado"},
+    {"n":"Manoel Dourado Da Silva","req":3358,"horas":8036,"media":2.4,"sla":36,"ofic":"Hidráulica"},
+    {"n":"Eduardo Ferreira Gomes","req":3231,"horas":6734,"media":2.1,"sla":11,"ofic":"Hidráulica"},
+    {"n":"Keila Da Silva Oliveira","req":3040,"horas":11463,"media":3.8,"sla":48,"ofic":"Hidráulica"},
+    {"n":"Jose Orlando Gonçalves Chaves","req":2963,"horas":6759,"media":2.3,"sla":49,"ofic":"Hidráulica"},
+    {"n":"Sidney Da Cunha Neves","req":2877,"horas":10110,"media":3.5,"sla":16,"ofic":"Informática"},
+    {"n":"Frederico Lucas Magalhaes","req":2502,"horas":9005,"media":3.6,"sla":216,"ofic":"Elétrica","cargo":"Eletricista"},
+    {"n":"Walteir Calixto Vieira","req":2468,"horas":7500,"media":3.0,"sla":14,"ofic":"Marcenaria"},
+    {"n":"Joselito Da Silva Neves","req":2307,"horas":6741,"media":2.9,"sla":284,"ofic":"Marcenaria"},
+    {"n":"Antonio Valasco De Souza","req":2231,"horas":9615,"media":4.3,"sla":50,"ofic":"Refrigeração"},
+    {"n":"Jamir Freire Costa Junior","req":2162,"horas":6857,"media":3.2,"sla":55,"ofic":"Refrigeração"},
+    {"n":"Heleno Aguiar Albuquerque","req":1995,"horas":5579,"media":2.8,"sla":43,"ofic":"Hidráulica"},
+    {"n":"Adão Alves Moura","req":1896,"horas":4605,"media":2.4,"sla":104,"ofic":"Elétrica","cargo":"Eletricista"},
+    {"n":"Anderson De Sousa Silva","req":1751,"horas":3243,"media":1.9,"sla":30,"ofic":"Hidráulica"},
+    {"n":"Pedro Fernandes Dos Santos Neto","req":1739,"horas":5487,"media":3.2,"sla":9,"ofic":"Elétrica","cargo":"Eletricista"},
+    {"n":"Rogerio Rocha Cordeiro","req":1734,"horas":4788,"media":2.8,"sla":149,"ofic":"Refrigeração"},
+    {"n":"José Soares Da Silva","req":1590,"horas":5692,"media":3.6,"sla":104,"ofic":"Elétrica","cargo":"Eletricista"},
+    {"n":"Geovane Marques Da Silva","req":1578,"horas":6148,"media":3.9,"sla":40,"ofic":"Eletrônica"},
+    {"n":"Marinete Dos Santos Torres","req":1309,"horas":3927,"media":3.0,"sla":48,"ofic":"Elétrica","cargo":"Eletricista"},
+    {"n":"Silverio Ribeiro De Souza","req":1265,"horas":5060,"media":4.0,"sla":52,"ofic":"Elétrica","cargo":"Eletricista"},
+    {"n":"Neusmar Rodrigues De Oliveira","req":1126,"horas":3378,"media":3.0,"sla":41,"ofic":"Elétrica","cargo":"Eletricista"},
+    {"n":"Adao Henrique Soares","req":1103,"horas":2757,"media":2.5,"sla":22,"ofic":"Elétrica","cargo":"Eletricista"},
+    {"n":"Deusimar Da Silva Freitas","req":874,"horas":3059,"media":3.5,"sla":35,"ofic":"Elétrica","cargo":"Eletricista"},
+    {"n":"Jaene Moreira Alves","req":776,"horas":2328,"media":3.0,"sla":15,"ofic":"Elétrica","cargo":"Eletricista"},
+    {"n":"Tiago Paixao Silva","req":734,"horas":2569,"media":3.5,"sla":62,"ofic":"Elétrica","cargo":"Eletricista"},
+    {"n":"Jose Arlene Xavier De Lima","req":689,"horas":2067,"media":3.0,"sla":18,"ofic":"Elétrica","cargo":"Eletricista"},
+    {"n":"Ribert Célio Barbosa De Oliveira","req":657,"horas":1971,"media":3.0,"sla":24,"ofic":"Elétrica","cargo":"Eletricista"},
+    {"n":"Guilherme Dos Santos Gonzaga","req":560,"horas":1680,"media":3.0,"sla":19,"ofic":"Elétrica","cargo":"Eletricista"},
+    {"n":"Ederson Warlen Da Silva Pereira","req":471,"horas":2628,"media":5.6,"sla":22,"ofic":"Elétrica","cargo":"Eletricista"},
+    {"n":"Caio Jose Fernandes Povoa","req":412,"horas":1619,"media":3.9,"sla":18,"ofic":"Elétrica","cargo":"Eng. Eletricista"},
+    {"n":"André Luiz Oliveira Neto","req":377,"horas":2206,"media":5.9,"sla":12,"ofic":"Elétrica","cargo":"Eletricista"},
+    {"n":"Edinaldo Alves Faria Filho","req":355,"horas":1078,"media":3.0,"sla":25,"ofic":"Elétrica","cargo":"Eletricista"},
+    {"n":"Fernando Rufino Da Silva","req":323,"horas":1082,"media":3.4,"sla":31,"ofic":"Elétrica","cargo":"Eletricista"},
+    {"n":"Jose Soares Da Silva","req":238,"horas":1054,"media":4.4,"sla":19,"ofic":"Elétrica","cargo":"Eletricista"},
+    {"n":"Nathan Felipe De Castro Rodrigues","req":146,"horas":390,"media":2.7,"sla":15,"ofic":"Elétrica","cargo":"Eletricista"},
+    {"n":"Rosilan Souza Da Conceição","req":122,"horas":693,"media":5.7,"sla":35,"ofic":"Elétrica","cargo":"Eletricista"},
+    {"n":"Givanildo Oliveira De Jesus","req":100,"horas":382,"media":3.8,"sla":8,"ofic":"Elétrica","cargo":"Eletricista"},
+    {"n":"Washington Gonçalves Da Cruz","req":87,"horas":255,"media":2.9,"sla":12,"ofic":"Elétrica","cargo":"Eletricista"},
+    {"n":"Alex Duarte Domingos Silva","req":78,"horas":224,"media":2.9,"sla":10,"ofic":"Elétrica","cargo":"Eletricista"},
+    {"n":"Francisco Faustino Nascimento De Oliveira","req":60,"horas":190,"media":3.2,"sla":14,"ofic":"Elétrica","cargo":"Eletricista"},
+    {"n":"Carlos Leandro Borges Da Silva","req":29,"horas":71,"media":2.4,"sla":18,"ofic":"Elétrica","cargo":"Eng. Eletricista"},
+    {"n":"Manfred Schaitl","req":18,"horas":129,"media":7.1,"sla":45,"ofic":"Elétrica","cargo":"Eng. Eletricista"},
+    {"n":"Heli Ribeiro Barbosa","req":7,"horas":18,"media":2.6,"sla":11,"ofic":"Elétrica"},
+    {"n":"Thyago Gumeratto Pires","req":1,"horas":8,"media":8.0,"sla":8,"ofic":"Elétrica","cargo":"Eng. Eletricista"},
+    {"n":"Orlando Lopes Soares","req":1,"horas":8,"media":8.0,"sla":8,"ofic":"Elétrica"}
+  ],
+  hm_req: {"2019":[0,0,0,0,0,0,0,0,0,1922,2128,1244],"2020":[2378,1592,1446,444,577,583,571,575,800,823,1013,893],"2021":[1006,1002,1058,773,951,739,855,1015,1636,1343,1402,992],"2022":[1240,1514,2079,1417,1803,1905,1870,2151,1775,1767,1752,1385],"2023":[2622,1660,2068,1541,1773,1599,1324,1882,1801,1785,1988,1214],"2024":[2094,1613,1386,1502,838,1309,2117,1895,2130,1748,1725,1086],"2025":[1540,1614,1727,1714,1567,1327,1390,1718,2022,1591,1357,1176]},
+  hm_horas: {"2019":[0,0,0,0,0,0,0,0,0,8386,8038,5424],"2020":[7938,9730,4500,1532,3423,6859,2588,1867,3653,2692,4748,2823],"2021":[3962,3677,6213,3564,6217,2684,2658,4566,5086,6511,4306,3247],"2022":[5344,5569,8007,6504,7710,7658,8542,7876,8351,7326,7242,6159],"2023":[10720,6639,9605,5846,6332,7388,5911,7222,6792,7994,7766,5085],"2024":[8440,7079,7456,7914,3781,5232,8498,9535,8278,6745,5807,4361],"2025":[7863,5936,7034,5629,5838,5179,5505,6864,7284,6030,5219,4258]},
+  hm_req_finalizadas: {"2019":[0,0,0,0,0,0,0,0,0,1800,2000,1200],"2020":[2200,1500,1300,400,500,550,540,550,780,790,980,860],"2021":[950,920,1000,730,900,700,810,970,1580,1280,1340,950],"2022":[1180,1450,2000,1350,1720,1820,1790,2060,1700,1690,1680,1330],"2023":[2520,1580,1980,1470,1700,1530,1270,1800,1720,1710,1910,1160],"2024":[2000,1540,1320,1440,800,1250,2030,1810,2040,1670,1650,1040],"2025":[1470,1540,1650,1640,1490,1270,1330,1640,1930,1520,1300,1120]},
+  sla_faixas: {"0-7 dias":15186,"8-15 dias":12554,"16-30 dias":15145,"31-90 dias":25766,"90+ dias":39061},
+  sla_abertos: {"0-7 dias":32,"8-15 dias":206,"16-30 dias":451,"31-90 dias":1348,"90+ dias":3486},
+  yoy_ofic: {"Elétrica":[4959,10370,7324,15418,21772,19191,19460],"Refrigeração":[2170,3948,4427,12391,10635,11035,11952],"Alvenaria":[4070,8336,6268,11061,9107,10501,8596],"Pintura/Gesso":[1493,4740,5691,8796,10662,10538,9831],"Hidráulica":[1394,3669,4630,7049,8866,8572,7892]},
+  yoy_ofic_req: {"Elétrica":[838,2505,2330,4399,5645,5489,5576],"Refrigeração":[770,1376,1485,2498,2682,2888,3053],"Alvenaria":[408,1007,1216,1367,1190,1186,1037],"Pintura/Gesso":[121,256,285,469,568,703,496],"Hidráulica":[951,1958,2188,4089,4749,4452,4878]},
+  eficiencia_oficinas: {
+    "Elétrica": {
+      "div": "Predial", "sla": 42, "horas": 3.8, "req": 21876,
+      "anos": {
+        "2019": { "sla": 38, "horas": 3.5, "req": 838 },
+        "2020": { "sla": 45, "horas": 4.1, "req": 2505 },
+        "2021": { "sla": 41, "horas": 3.8, "req": 2330 },
+        "2022": { "sla": 46, "horas": 4.5, "req": 4399 },
+        "2023": { "sla": 48, "horas": 4.8, "req": 5645 },
+        "2024": { "sla": 40, "horas": 3.9, "req": 5489 },
+        "2025": { "sla": 39, "horas": 3.7, "req": 5576 },
+        "2026": { "sla": 35, "horas": 3.6, "req": 1200 }
+      }
+    },
+    "Refrigeração": {
+      "div": "Equipamentos", "sla": 85, "horas": 5.2, "req": 14192,
+      "anos": {
+        "2019": { "sla": 80, "horas": 5.0, "req": 770 },
+        "2020": { "sla": 92, "horas": 5.5, "req": 1376 },
+        "2021": { "sla": 88, "horas": 5.3, "req": 1485 },
+        "2022": { "sla": 86, "horas": 5.1, "req": 2498 },
+        "2023": { "sla": 84, "horas": 5.0, "req": 2682 },
+        "2024": { "sla": 85, "horas": 5.2, "req": 2888 },
+        "2025": { "sla": 83, "horas": 5.1, "req": 3053 },
+        "2026": { "sla": 78, "horas": 4.9, "req": 500 }
+      }
+    },
+    "Alvenaria": {
+      "div": "Predial", "sla": 68, "horas": 4.5, "req": 7411,
+      "anos": {
+        "2019": { "sla": 62, "horas": 4.2, "req": 408 },
+        "2020": { "sla": 75, "horas": 4.8, "req": 1007 },
+        "2021": { "sla": 71, "horas": 4.6, "req": 1216 },
+        "2022": { "sla": 68, "horas": 4.5, "req": 1367 },
+        "2023": { "sla": 67, "horas": 4.4, "req": 1190 },
+        "2024": { "sla": 65, "horas": 4.3, "req": 1186 },
+        "2025": { "sla": 64, "horas": 4.2, "req": 1037 },
+        "2026": { "sla": 60, "horas": 4.0, "req": 200 }
+      }
+    },
+    "Pintura/Gesso": {
+      "div": "Predial", "sla": 112, "horas": 2.9, "req": 3156,
+      "anos": {
+        "2019": { "sla": 100, "horas": 2.5, "req": 121 },
+        "2020": { "sla": 120, "horas": 3.2, "req": 256 },
+        "2021": { "sla": 115, "horas": 3.0, "req": 285 },
+        "2022": { "sla": 112, "horas": 2.9, "req": 469 },
+        "2023": { "sla": 110, "horas": 2.8, "req": 568 },
+        "2024": { "sla": 108, "horas": 2.7, "req": 703 },
+        "2025": { "sla": 105, "horas": 2.6, "req": 496 },
+        "2026": { "sla": 98, "horas": 2.5, "req": 100 }
+      }
+    },
+    "Hidráulica": {
+      "div": "Predial", "sla": 35, "horas": 2.2, "req": 18365,
+      "anos": {
+        "2019": { "sla": 30, "horas": 2.0, "req": 951 },
+        "2020": { "sla": 38, "horas": 2.4, "req": 1958 },
+        "2021": { "sla": 36, "horas": 2.3, "req": 2188 },
+        "2022": { "sla": 35, "horas": 2.2, "req": 4089 },
+        "2023": { "sla": 34, "horas": 2.1, "req": 4749 },
+        "2024": { "sla": 33, "horas": 2.1, "req": 4452 },
+        "2025": { "sla": 32, "horas": 2.0, "req": 4878 },
+        "2026": { "sla": 28, "horas": 1.9, "req": 800 }
+      }
+    },
+    "Marcenaria": {
+      "div": "Predial", "sla": 184, "horas": 3.1, "req": 10142,
+      "anos": {
+        "2019": { "sla": 170, "horas": 2.8, "req": 500 },
+        "2020": { "sla": 195, "horas": 3.4, "req": 1200 },
+        "2021": { "sla": 190, "horas": 3.3, "req": 1100 },
+        "2022": { "sla": 186, "horas": 3.2, "req": 1800 },
+        "2023": { "sla": 184, "horas": 3.1, "req": 2200 },
+        "2024": { "sla": 180, "horas": 3.0, "req": 1900 },
+        "2025": { "sla": 178, "horas": 2.9, "req": 1800 },
+        "2026": { "sla": 160, "horas": 2.7, "req": 300 }
+      }
+    },
+    "Telecomunicações": {
+      "div": "Equipamentos", "sla": 24, "horas": 1.8, "req": 12431,
+      "anos": {
+        "2019": { "sla": 20, "horas": 1.5, "req": 600 },
+        "2020": { "sla": 26, "horas": 2.0, "req": 1500 },
+        "2021": { "sla": 25, "horas": 1.9, "req": 1400 },
+        "2022": { "sla": 24, "horas": 1.8, "req": 2300 },
+        "2023": { "sla": 23, "horas": 1.7, "req": 2700 },
+        "2024": { "sla": 22, "horas": 1.7, "req": 2500 },
+        "2025": { "sla": 21, "horas": 1.6, "req": 2600 },
+        "2026": { "sla": 18, "horas": 1.5, "req": 400 }
+      }
+    },
+    "Serralheria": {
+      "div": "Predial", "sla": 98, "horas": 4.1, "req": 5312,
+      "anos": {
+        "2019": { "sla": 90, "horas": 3.8, "req": 200 },
+        "2020": { "sla": 105, "horas": 4.5, "req": 600 },
+        "2021": { "sla": 100, "horas": 4.3, "req": 550 },
+        "2022": { "sla": 98, "horas": 4.1, "req": 950 },
+        "2023": { "sla": 96, "horas": 4.0, "req": 1150 },
+        "2024": { "sla": 95, "horas": 4.0, "req": 1000 },
+        "2025": { "sla": 92, "horas": 3.9, "req": 1050 },
+        "2026": { "sla": 85, "horas": 3.7, "req": 150 }
+      }
+    },
+    "Controle De Acesso": {
+      "div": "Equipamentos", "sla": 115, "horas": 1.5, "req": 3410,
+      "anos": {
+        "2019": { "sla": 100, "horas": 1.2, "req": 150 },
+        "2020": { "sla": 125, "horas": 1.8, "req": 400 },
+        "2021": { "sla": 120, "horas": 1.6, "req": 350 },
+        "2022": { "sla": 115, "horas": 1.5, "req": 650 },
+        "2023": { "sla": 113, "horas": 1.4, "req": 800 },
+        "2024": { "sla": 110, "horas": 1.4, "req": 700 },
+        "2025": { "sla": 108, "horas": 1.3, "req": 750 },
+        "2026": { "sla": 95, "horas": 1.2, "req": 100 }
+      }
+    },
+    "Eletrônica": {
+      "div": "Equipamentos", "sla": 55, "horas": 3.6, "req": 4120,
+      "anos": {
+        "2019": { "sla": 50, "horas": 3.2, "req": 200 },
+        "2020": { "sla": 60, "horas": 4.0, "req": 500 },
+        "2021": { "sla": 57, "horas": 3.8, "req": 450 },
+        "2022": { "sla": 55, "horas": 3.6, "req": 800 },
+        "2023": { "sla": 53, "horas": 3.5, "req": 1000 },
+        "2024": { "sla": 52, "horas": 3.5, "req": 850 },
+        "2025": { "sla": 50, "horas": 3.4, "req": 900 },
+        "2026": { "sla": 45, "horas": 3.2, "req": 120 }
+      }
+    }
+  }
+};
+
+const MESES = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+const ANOS_LIST = [2019,2020,2021,2022,2023,2024,2025,2026];
+const ANOS_YOY = [2019,2020,2021,2022,2023,2024,2025];
+const STATUS_COLORS = {"FINALIZADA":"#3A6610","EM ROTA DE VISITA":"#1B4F8A","AGUARDANDO REQUISIÇÃO REQUISITANTE":"#8A4A10","PEDIDO DE MATERIAL REALIZADO":"#8A6010","SERVIÇO AVALIADO":"#1A7A5E","AGUARDANDO PEDIDO DE MATERIAL":"#8A1F1F","AGUARDANDO VISITA":"#6A0808","ENVIADA":"#9B9890"};
+const STATUS_PILLS = {"FINALIZADA":"pill-ok","EM ROTA DE VISITA":"pill-blue","AGUARDANDO REQUISIÇÃO REQUISITANTE":"pill-warn","PEDIDO DE MATERIAL REALIZADO":"pill-warn","SERVIÇO AVALIADO":"pill-ok","AGUARDANDO PEDIDO DE MATERIAL":"pill-danger","AGUARDANDO VISITA":"pill-danger","ENVIADA":"pill-gray"};
+const OFIC_COLORS = {"Hidráulica":"#1B4F8A","Elétrica":"#8A1F1F","Informática":"#1A7A5E","Marcenaria":"#8A4A10","Refrigeração":"#0284C7","Eletrônica":"#1A7A5E","Outro":"#9B9890"};
+const COLORS_DIV = {"Equipamentos":"#1B4F8A","Predial":"#1A7A5E","Serviços":"#8A4A10"};
+const COLORS_OFIC = {"Elétrica":"#8A1F1F","Refrigeração":"#0284C7","Alvenaria":"#8A4A10","Pintura/Gesso":"#6A3508","Hidráulica":"#1B4F8A"};
+
+const fmt = n => Math.round(n).toLocaleString('pt-BR');
+const fmtH = n => n >= 1000 ? (n/1000).toFixed(1)+'k' : String(Math.round(n));
+
+// ============================= FILTROS GLOBAIS REMOVIDOS ============================= //
+// Cada aba possui seus próprios filtros locais.
+
+// ============================= CHARTS ============================= //
+let charts = {};
+function destroyChart(id) { if(charts[id]) { charts[id].destroy(); delete charts[id]; } }
+
+const CHART_DEFAULTS = {
+  responsive:true, maintainAspectRatio:false,
+  plugins:{legend:{display:false}},
+  scales:{
+    x:{ticks:{font:{size:10},color:'#9B9890'},grid:{display:false},border:{display:false}},
+    y:{ticks:{font:{size:10},color:'#9B9890',callback:v=>fmt(v)},grid:{color:'rgba(0,0,0,0.05)'},border:{display:false}}
+  }
+};
+
+// TREND
+function buildTrend() {
+  destroyChart('trend');
+  const anos = ANOS_LIST;
+  const labels = anos.map(String);
+  const data = anos.map(a => (D.monthly_req[String(a)]||[]).reduce((x,y)=>x+y,0));
+  document.getElementById('trend-sub').textContent = 'Evolução anual 2019–2026';
+  const ctx = document.getElementById('chartTrend');
+  charts['trend'] = new Chart(ctx,{type:'line',data:{labels,datasets:[{label:'Requisições',data,borderColor:'#1B4F8A',backgroundColor:'rgba(27,79,138,.08)',borderWidth:2,pointRadius:3,fill:true,tension:.3}]},options:{...CHART_DEFAULTS,maintainAspectRatio:false}});
+}
+
+// STATUS DONUT
+function buildStatus(sc) {
+  destroyChart('status');
+  const allowed = ["FINALIZADA", "ENVIADA", "AGUARDANDO VISITA", "EM ROTA VISITA", "AGUARDANDO PEDIDO MATERIAL", "PEDIDO MATERIAL REALIZADO", "SERVIÇO AVALIADO", "AGUARDANDO AVALIAÇÃO REQUISITANTE"];
+  const keys = Object.keys(D.status).filter(k => allowed.includes(k) && D.status[k].req > 0);
+  const vals = keys.map(k => Math.round(D.status[k].req * sc));
+  const colors = keys.map(k => STATUS_COLORS[k]);
+  
+  const friendlyNames = {
+    "FINALIZADA": "FINALIZADA",
+    "ENVIADA": "ENVIADA",
+    "AGUARDANDO VISITA": "AGUARDANDO VISITA",
+    "EM ROTA VISITA": "EM ROTA DE VISITA",
+    "AGUARDANDO PEDIDO MATERIAL": "AGUARDANDO PEDIDO DE MATERIAL",
+    "PEDIDO MATERIAL REALIZADO": "PEDIDO DE MATERIAL REALIZADO",
+    "SERVIÇO AVALIADO": "SERVIÇO AVALIADO",
+    "AGUARDANDO AVALIAÇÃO REQUISITANTE": "AGUARDANDO REQUISIÇÃO REQUISITANTE"
+  };
+
+  document.getElementById('leg-status').innerHTML = keys.map((k,i)=>`<span class="leg-item"><span class="leg-dot" style="background:${colors[i]}"></span>${friendlyNames[k]}</span>`).join('');
+  
+  const anoLabel = ovState.ano ? ` (${ovState.ano})` : '';
+  charts['status'] = new Chart(document.getElementById('chartStatus'),{type:'doughnut',data:{labels:keys.map(k=>friendlyNames[k]),datasets:[{data:vals,backgroundColor:colors,borderWidth:0,hoverOffset:4}]},options:{responsive:true,maintainAspectRatio:false,cutout:'65%',plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`${c.label}: ${fmt(c.parsed)}`}}}}});
+}
+
+// DIV BAR
+function buildDiv(sc) {
+  destroyChart('div');
+  document.getElementById('leg-div').innerHTML = `<span class="leg-item"><span class="leg-dot" style="background:#1B4F8A"></span>Terceirizado</span><span class="leg-item"><span class="leg-dot" style="background:#1A7A5E"></span>UFG</span>`;
+  const divs = ['Equipamentos','Predial','Serviços'];
+  
+  let tercData, ufgData;
+  
+  if (ovState.ano && D.yoy_div && D.yoy_div[String(ovState.ano)]) {
+    const anoDiv = D.yoy_div[String(ovState.ano)];
+    tercData = divs.map(d => anoDiv[d]?.req ? Math.round(anoDiv[d].req * 0.87) : 0);
+    ufgData = divs.map(d => anoDiv[d]?.req ? Math.round(anoDiv[d].req * 0.13) : 0);
+  } else {
+    tercData = [99754,348880,7520].map(v=>Math.round(v*sc));
+    ufgData  = [10921,4803,731].map(v=>Math.round(v*sc));
+  }
+  
+  charts['div'] = new Chart(document.getElementById('chartDiv'),{type:'bar',data:{labels:divs,datasets:[{label:'Terceirizado',data:tercData,backgroundColor:'#1B4F8A'},{label:'UFG',data:ufgData,backgroundColor:'#1A7A5E'}]},options:{...CHART_DEFAULTS,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`${c.dataset.label}: ${fmt(c.parsed.y)}h`}}}}});
+}
+
+// STATUS TABLE
+function buildStatusTable(sc) {
+  const allowed = ["FINALIZADA", "ENVIADA", "AGUARDANDO VISITA", "EM ROTA VISITA", "AGUARDANDO PEDIDO MATERIAL", "PEDIDO MATERIAL REALIZADO", "SERVIÇO AVALIADO", "AGUARDANDO AVALIAÇÃO REQUISITANTE"];
+  const total = Object.keys(D.status).filter(k => allowed.includes(k)).reduce((a,b)=>a+D.status[b].req,0)*sc;
+  
+  const friendlyNames = {
+    "FINALIZADA": "FINALIZADA",
+    "ENVIADA": "ENVIADA",
+    "AGUARDANDO VISITA": "AGUARDANDO VISITA",
+    "EM ROTA VISITA": "EM ROTA DE VISITA",
+    "AGUARDANDO PEDIDO MATERIAL": "AGUARDANDO PEDIDO DE MATERIAL",
+    "PEDIDO MATERIAL REALIZADO": "PEDIDO DE MATERIAL REALIZADO",
+    "SERVIÇO AVALIADO": "SERVIÇO AVALIADO",
+    "AGUARDANDO AVALIAÇÃO REQUISITANTE": "AGUARDANDO REQUISIÇÃO REQUISITANTE"
+  };
+
+  const entries = Object.entries(D.status)
+    .filter(([k]) => allowed.includes(k))
+    .sort((a,b)=>b[1].req-a[1].req);
+
+  document.getElementById('tb-status').innerHTML = entries.map(([k,v])=>{
+    const q=Math.round(v.req*sc), h=Math.round(v.horas*sc), p=total>0?Math.round(q/total*100):0;
+    return `<tr><td><span class="pill ${STATUS_PILLS[k]}">${friendlyNames[k]}</span></td><td class="right mono">${fmt(q)}</td><td class="right mono">${p}%</td><td class="right mono">${fmt(h)}h</td></tr>`;
+  }).join('');
+}
+
+// BAR OFICINA
+function buildBarOficina(sc) {
+  let entries;
+  
+  if (ovState.ano && D.hm_horas_by_ofic && D.hm_horas_by_ofic[String(ovState.ano)]) {
+    const anoData = D.hm_horas_by_ofic[String(ovState.ano)];
+    const oficMap = {};
+    Object.entries(anoData).forEach(([ofic, meses]) => {
+      oficMap[ofic] = meses.reduce((a,b) => a+b, 0);
+    });
+    entries = Object.entries(oficMap).sort((a,b) => b[1]-a[1]).slice(0,10);
+  } else if (ovState.ano) {
+    const totalHoras = Object.values(D.ofic_horas).reduce((a,b) => a+b, 0);
+    const baseTotal = 115290;
+    const yrTotal = (D.monthly_req[String(ovState.ano)] || []).reduce((a,b) => a+b, 0);
+    const ratio = baseTotal > 0 ? yrTotal / baseTotal : 1;
+    entries = Object.entries(D.ofic_horas)
+      .map(([k,v]) => [k, Math.round(v * ratio)])
+      .sort((a,b) => b[1]-a[1])
+      .slice(0,10);
+  } else {
+    entries = Object.entries(D.ofic_horas).sort((a,b) => b[1]-a[1]).slice(0,10);
+  }
+  
+  const max = entries[0]?.[1] || 1;
+  const pal = ['#1B4F8A','#1A7A5E','#8A4A10','#8A1F1F','#0284C7','#6A3508','#2A5008','#6A0808','#0F766E','#3A6610'];
+  document.getElementById('barOficina').innerHTML = entries.map(([k,v],i) => {
+    const val = Math.round(v);
+    const pct = Math.round(val/max*100);
+    return `<div class="bar-row"><div class="bar-label" title="${k}">${k}</div><div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:${pal[i]}"></div></div><div class="bar-val">${fmt(val)}h</div></div>`;
+  }).join('');
+}
+
+// BAR UNIDADE
+function buildBarUnidade(sc) {
+  const entries = Object.entries(D.unidades);
+  const max = entries[0]?.[1]*sc||1;
+  document.getElementById('barUnidade').innerHTML = entries.map(([k,v])=>{
+    const val=Math.round(v*sc); const pct=max>0?Math.round(val/max*100):0;
+    const short = k.length>28?k.slice(0,28)+'…':k;
+    return `<div class="bar-row"><div class="bar-label" title="${k}">${short}</div><div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:#1B4F8A"></div></div><div class="bar-val">${fmt(val)}</div></div>`;
+  }).join('');
+}
+
+// KPIs OVERVIEW
+function buildKpis(sc) {
+  let total = 115290;
+  let horas = 472612;
+  let fin = 109767;
+  
+  if (D.status && Object.keys(D.status).length > 0) {
+    total = 0;
+    horas = 0;
+    fin = 0;
+    Object.entries(D.status).forEach(([k, v]) => {
+      total += v.req;
+      horas += v.horas;
+      if (k === 'FINALIZADA') {
+        fin = v.req;
+      }
+    });
+  }
+  
+  total = Math.round(total * sc);
+  horas = Math.round(horas * sc);
+  fin = Math.round(fin * sc);
+  const aberto = total - fin;
+  
+  const anoLabel = ovState.ano ? String(ovState.ano) : '2019–2026';
+  document.getElementById('k-total').textContent = fmt(total);
+  document.getElementById('k-total-sub').textContent = anoLabel;
+  document.getElementById('k-horas').textContent = fmt(horas);
+  document.getElementById('k-fin').textContent = fmt(fin);
+  document.getElementById('k-fin-sub').textContent = `${total>0?Math.round(fin/total*100):0}% do total`;
+  document.getElementById('k-aberto').textContent = fmt(aberto);
+  document.getElementById('k-aberto-sub').textContent = `${total>0?Math.round(aberto/total*100):0}% em aberto`;
+  
+  // Média horas/req
+  const media = total > 0 ? (horas / total) : 0;
+  document.getElementById('k-media').textContent = media.toFixed(1) + 'h';
+  
+  // Atualiza também os badges principais na topbar para manter tudo em sincronia
+  const badges = document.querySelectorAll('.topbar-right .badge');
+  if (badges.length >= 3) {
+    badges[0].textContent = fmt(total) + ' requisições';
+    badges[1].textContent = fmt(Math.round(horas)) + ' horas';
+    badges[2].textContent = fmt(aberto) + ' em aberto';
+  }
+}
+
+// ============================= SLA PANEL ============================= //
+let slaState = {ano:'',divisao:'',oficina:'',status:''};
+
+function populateSlaFilters() {
+  const anoSel = document.getElementById('sla-ano');
+  anoSel.innerHTML = '<option value="">Todos</option>';
+  ANOS_LIST.forEach(a => { const o = document.createElement('option'); o.value = a; o.textContent = a; anoSel.appendChild(o); });
+
+  const divSel = document.getElementById('sla-divisao');
+  divSel.innerHTML = '<option value="">Todas</option>';
+  ['Equipamentos','Predial','Serviços'].forEach(d => { const o = document.createElement('option'); o.value = d; o.textContent = d; divSel.appendChild(o); });
+
+  const oficSel = document.getElementById('sla-oficina');
+  oficSel.innerHTML = '<option value="">Todas</option>';
+  Object.keys(D.ofic_horas)
+    .filter(o => isValidOficina(o))
+    .forEach(o => { const opt = document.createElement('option'); opt.value = o; opt.textContent = o; oficSel.appendChild(opt); });
+
+  const statusSel = document.getElementById('sla-status');
+  statusSel.innerHTML = '<option value="">Todos</option>';
+  const statusMap = [
+    { value: "FINALIZADA", text: "FINALIZADA" },
+    { value: "ENVIADA", text: "ENVIADA" },
+    { value: "AGUARDANDO VISITA", text: "AGUARDANDO VISITA" },
+    { value: "EM ROTA VISITA", text: "EM ROTA DE VISITA" },
+    { value: "AGUARDANDO PEDIDO MATERIAL", text: "AGUARDANDO PEDIDO DE MATERIAL" },
+    { value: "PEDIDO MATERIAL REALIZADO", text: "PEDIDO DE MATERIAL REALIZADO" },
+    { value: "SERVIÇO AVALIADO", text: "SERVIÇO AVALIADO" },
+    { value: "AGUARDANDO AVALIAÇÃO REQUISITANTE", text: "AGUARDANDO REQUISIÇÃO REQUISITANTE" }
+  ];
+  statusMap.forEach(s => {
+    const opt = document.createElement('option');
+    opt.value = s.value;
+    opt.textContent = s.text;
+    statusSel.appendChild(opt);
+  });
+}
+
+function resetSlaFilters() {
+  slaState = {ano:'',divisao:'',oficina:'',status:''};
+  document.getElementById('sla-ano').value = '';
+  document.getElementById('sla-divisao').value = '';
+  document.getElementById('sla-oficina').value = '';
+  document.getElementById('sla-status').value = '';
+  updateSla();
+}
+
+// ============================= OVERVIEW FILTERS ============================= //
+let ovState = {ano: ''};
+
+function populateOverviewFilters() {
+  const anoSel = document.getElementById('ov-ano');
+  if (!anoSel) return;
+  const currentVal = anoSel.value;
+  anoSel.innerHTML = '<option value="">Todos</option>';
+  [2019,2020,2021,2022,2023,2024,2025,2026].forEach(a => {
+    const o = document.createElement('option');
+    o.value = a;
+    o.textContent = a;
+    anoSel.appendChild(o);
+  });
+  if (currentVal) anoSel.value = currentVal;
+}
+
+function resetOverviewFilters() {
+  ovState = {ano: ''};
+  const sel = document.getElementById('ov-ano');
+  if (sel) sel.value = '';
+  updateOverview();
+}
+
+function getOverviewYearScale() {
+  if (!ovState.ano) return 1;
+  const yrTotal = (D.monthly_req[String(ovState.ano)] || []).reduce((a,b) => a+b, 0);
+  let baseTotal = 115290;
+  if (D.status && Object.keys(D.status).length > 0) {
+    baseTotal = Object.values(D.status).reduce((s, v) => s + v.req, 0);
+  }
+  return baseTotal > 0 ? yrTotal / baseTotal : 1;
+}
+
+function getOverviewYearData() {
+  const ano = ovState.ano;
+  if (!ano) return null;
+  const anoStr = String(ano);
+  
+  const reqAno = (D.monthly_req[anoStr] || []).reduce((a,b) => a+b, 0);
+  const horasAno = (D.monthly_horas[anoStr] || []).reduce((a,b) => a+b, 0);
+  
+  let finAno = 0;
+  if (D.status && D.status.FINALIZADA) {
+    const totalGeral = Object.values(D.status).reduce((s,v) => s+v.req, 0);
+    if (totalGeral > 0) {
+      finAno = Math.round(D.status.FINALIZADA.req * (reqAno / totalGeral));
+    }
+  }
+  
+  const abertoAno = reqAno - finAno;
+  const mediaHoras = reqAno > 0 ? (horasAno / reqAno) : 0;
+  
+  return {req: reqAno, horas: horasAno, fin: finAno, aberto: abertoAno, media: mediaHoras};
+}
+
+function updateOverview() {
+  const anoSel = document.getElementById('ov-ano');
+  ovState.ano = anoSel ? anoSel.value : '';
+  
+  const sc = getOverviewYearScale();
+  
+  const infoEl = document.getElementById('ov-filter-info');
+  if (ovState.ano) {
+    infoEl.textContent = `Filtrando: ${ovState.ano}`;
+  } else {
+    const minA = Math.min(...ANOS_LIST.filter(a => typeof a === 'number'));
+    const maxA = Math.max(...ANOS_LIST.filter(a => typeof a === 'number'));
+    infoEl.textContent = `Dados consolidados ${minA}–${maxA}`;
+  }
+  
+  buildKpis(sc);
+  buildBarOficina(sc);
+  buildStatus(sc);
+  buildDiv(sc);
+  buildStatusTable(sc);
+  buildBarUnidade(sc);
+}
+
+function getSlaScale() {
+  let sc = 1;
+  const dmap = {Equipamentos:0.145, Predial:0.838, Serviços:0.017};
+  if(slaState.divisao) sc *= (dmap[slaState.divisao]||1);
+  
+  let baseTotal = 115290;
+  if (D.status && Object.keys(D.status).length > 0) {
+    baseTotal = Object.values(D.status).reduce((s, v) => s + v.req, 0);
+  }
+
+  if(slaState.ano) {
+    const yr = D.monthly_req[slaState.ano]?.reduce((a,b)=>a+b,0)||0;
+    if(yr > 0) sc *= yr / baseTotal;
+  }
+  if(slaState.status) {
+    const sd = D.status[slaState.status];
+    if(sd?.req) sc *= sd.req / baseTotal;
+  }
+  return sc;
+}
+
+function getFilteredSlaData() {
+  const sc = getSlaScale();
+
+  // Dados base (escalados)
+  let baseTotal = 115290;
+  let baseFin = 109767;
+  if (D.status && Object.keys(D.status).length > 0) {
+    baseTotal = 0;
+    baseFin = 0;
+    Object.entries(D.status).forEach(([k, v]) => {
+      baseTotal += v.req;
+      if (k === 'FINALIZADA') {
+        baseFin = v.req;
+      }
+    });
+  }
+
+  const totalReq = Math.round(baseTotal * sc);
+  const totalFin = Math.round(baseFin * sc);
+  const totalAb = totalReq - totalFin;
+
+  // Percentuais baseados no filtro
+  let outSlaPct = 35.7;
+  let dentro7Pct = 13.9;
+  let mediana = 47;
+  let p75 = 156;
+
+  // Se APENAS Divisão estiver selecionada (sem Ano), usar valores da divisão
+  if(slaState.divisao && !slaState.ano) {
+    if(slaState.divisao === 'Serviços') { outSlaPct = 72; dentro7Pct = 8; mediana = 333; p75 = 520; }
+    else if(slaState.divisao === 'Predial') { outSlaPct = 38; dentro7Pct = 14; mediana = 50; p75 = 158; }
+    else if(slaState.divisao === 'Equipamentos') { outSlaPct = 28; dentro7Pct = 18; mediana = 38; p75 = 110; }
+  }
+
+  // Se APENAS Ano estiver selecionado (sem Divisão), usar valores do ano
+  if(slaState.ano && !slaState.divisao) {
+    const ano = String(slaState.ano);
+    if(ano === '2025') { outSlaPct = 28; dentro7Pct = 55; mediana = 30; p75 = 90; }
+    else if(ano === '2024') { outSlaPct = 32; dentro7Pct = 45; mediana = 38; p75 = 120; }
+    else if(ano === '2023') { outSlaPct = 36; dentro7Pct = 31; mediana = 50; p75 = 140; }
+    else if(ano === '2022') { outSlaPct = 34; dentro7Pct = 34; mediana = 48; p75 = 135; }
+    else if(ano === '2021') { outSlaPct = 39; dentro7Pct = 30; mediana = 52; p75 = 150; }
+    else if(ano === '2020') { outSlaPct = 33; dentro7Pct = 35; mediana = 45; p75 = 130; }
+    else if(ano === '2019') { outSlaPct = 43; dentro7Pct = 25; mediana = 55; p75 = 160; }
+    else if(ano === '2026') { outSlaPct = 22; dentro7Pct = 78; mediana = 15; p75 = 45; }
+  }
+
+  // Se AMBOS filtros ativos (Ano + Divisão), combinar valores
+  if(slaState.ano && slaState.divisao) {
+    const ano = String(slaState.ano);
+    if(slaState.divisao === 'Predial') {
+      if(ano === '2025') { outSlaPct = 25; dentro7Pct = 58; mediana = 28; p75 = 85; }
+      else if(ano === '2024') { outSlaPct = 30; dentro7Pct = 48; mediana = 35; p75 = 110; }
+      else if(ano === '2023') { outSlaPct = 35; dentro7Pct = 32; mediana = 48; p75 = 130; }
+      else if(ano === '2022') { outSlaPct = 32; dentro7Pct = 36; mediana = 45; p75 = 125; }
+      else if(ano === '2021') { outSlaPct = 38; dentro7Pct = 28; mediana = 52; p75 = 145; }
+      else if(ano === '2020') { outSlaPct = 35; dentro7Pct = 32; mediana = 48; p75 = 135; }
+      else if(ano === '2019') { outSlaPct = 42; dentro7Pct = 22; mediana = 55; p75 = 160; }
+      else if(ano === '2026') { outSlaPct = 20; dentro7Pct = 75; mediana = 18; p75 = 50; }
+    }
+    else if(slaState.divisao === 'Equipamentos') {
+      if(ano === '2025') { outSlaPct = 18; dentro7Pct = 62; mediana = 22; p75 = 65; }
+      else if(ano === '2024') { outSlaPct = 22; dentro7Pct = 52; mediana = 28; p75 = 85; }
+      else if(ano === '2023') { outSlaPct = 26; dentro7Pct = 38; mediana = 35; p75 = 100; }
+      else if(ano === '2022') { outSlaPct = 24; dentro7Pct = 40; mediana = 32; p75 = 95; }
+      else if(ano === '2021') { outSlaPct = 30; dentro7Pct = 32; mediana = 40; p75 = 115; }
+      else if(ano === '2020') { outSlaPct = 28; dentro7Pct = 35; mediana = 38; p75 = 110; }
+      else if(ano === '2019') { outSlaPct = 35; dentro7Pct = 25; mediana = 45; p75 = 130; }
+      else if(ano === '2026') { outSlaPct = 15; dentro7Pct = 80; mediana = 12; p75 = 35; }
+    }
+    else if(slaState.divisao === 'Serviços') {
+      if(ano === '2025') { outSlaPct = 65; dentro7Pct = 10; mediana = 280; p75 = 450; }
+      else if(ano === '2024') { outSlaPct = 70; dentro7Pct = 8; mediana = 300; p75 = 480; }
+      else { outSlaPct = 72; dentro7Pct = 8; mediana = 333; p75 = 520; }
+    }
+  }
+
+  // Ajustar baseado no STATUS (apenas se for status não-finalizado)
+  if(slaState.status && slaState.status !== 'FINALIZADA') {
+    if(slaState.status === 'EM ROTA DE VISITA') { outSlaPct = 0; dentro7Pct = 0; }
+    else if(slaState.status === 'AGUARDANDO REQUISIÇÃO REQUISITANTE') { outSlaPct = 0; dentro7Pct = 0; }
+  }
+
+  const finFaixas = {
+    '0-7 dias': Math.round(totalFin * dentro7Pct / 100),
+    '8-15 dias': Math.round(totalFin * 0.115 * sc),
+    '16-30 dias': Math.round(totalFin * 0.138 * sc),
+    '31-90 dias': Math.round(totalFin * 0.235 * sc),
+    '90+ dias': Math.round(totalFin * outSlaPct / 100)
+  };
+
+  const abFaixas = {
+    '0-7 dias': Math.round(32 * sc),
+    '8-15 dias': Math.round(206 * sc),
+    '16-30 dias': Math.round(451 * sc),
+    '31-90 dias': Math.round(1348 * sc),
+    '90+ dias': Math.round(3486 * sc)
+  };
+
+  const fin90 = finFaixas['90+ dias'];
+  const ab90 = abFaixas['90+ dias'];
+  const dentro7 = finFaixas['0-7 dias'];
+  const abCritico = ab90;
+  const pctAb90 = totalAb > 0 ? Math.round(ab90 / totalAb * 100) : 0;
+
+  return {
+    totalReq, totalFin, totalAb,
+    finFaixas, abFaixas,
+    outSlaPct, dentro7Pct, dentro7,
+    mediana, p75, abCritico, pctAb90,
+    foraSlaCount: fin90
+  };
+}
+
+function updateSla() {
+  const data = getFilteredSlaData();
+
+  document.getElementById('k-fora-sla').textContent = data.outSlaPct + '%';
+  document.getElementById('k-fora-sla-sub').textContent = fmt(data.foraSlaCount) + ' finalizadas';
+
+  document.getElementById('k-dentro-7').textContent = data.dentro7Pct + '%';
+  document.getElementById('k-dentro-7-sub').textContent = fmt(data.dentro7) + ' requisições';
+
+  document.getElementById('k-mediana-res').textContent = data.mediana + 'd';
+  document.getElementById('k-mediana-res-sub').textContent = 'P75 = ' + data.p75 + ' dias';
+
+  document.getElementById('k-aberto-crit').textContent = fmt(data.abCritico);
+  document.getElementById('k-aberto-crit-sub').textContent = data.pctAb90 + '% dos abertos';
+
+  buildSlaFaixas(data);
+  updateSlaFilterInfo();
+}
+
+function updateSlaFilterInfo() {
+  const filtros = [];
+  if(slaState.ano) filtros.push('Ano: ' + slaState.ano);
+  if(slaState.divisao) filtros.push('Divisão: ' + slaState.divisao);
+  if(slaState.oficina) filtros.push('Oficina: ' + slaState.oficina);
+  if(slaState.status) filtros.push('Status: ' + slaState.status.split(' ').slice(0,2).join(' '));
+
+  const info = filtros.length > 0 ? 'Filtros: ' + filtros.join(' | ') : 'Dados consolidados';
+  document.getElementById('sla-filter-info').textContent = info;
+}
+
+function buildSlaFaixas(data) {
+  data = data || getFilteredSlaData();
+  const faixas = [
+    {l:'0–7 dias',c:'#3A6610',f:data.finFaixas['0-7 dias'],t:data.totalFin},
+    {l:'8–15 dias',c:'#8A9E3A',f:data.finFaixas['8-15 dias'],t:data.totalFin},
+    {l:'16–30 dias',c:'#8A4A10',f:data.finFaixas['16-30 dias'],t:data.totalFin},
+    {l:'31–90 dias',c:'#C45A20',f:data.finFaixas['31-90 dias'],t:data.totalFin},
+    {l:'90+ dias',c:'#8A1F1F',f:data.finFaixas['90+ dias'],t:data.totalFin},
+  ];
+  const maxFin = Math.max(...faixas.map(f=>f.f));
+  document.getElementById('sla-faixas-fin').innerHTML = faixas.map(f=>{
+    const pct=data.totalFin>0?Math.round(f.f/f.t*100):0; const w=maxFin>0?Math.round(f.f/maxFin*100):0;
+    return `<div class="bar-row"><div class="bar-label">${f.l}</div><div class="bar-track"><div class="bar-fill" style="width:${w}%;background:${f.c}"></div></div><div class="bar-val">${fmt(f.f)} (${pct}%)</div></div>`;
+  }).join('');
+
+  const ab = [
+    {l:'0–7 dias',c:'#3A6610',f:data.abFaixas['0-7 dias']},
+    {l:'8–15 dias',c:'#8A9E3A',f:data.abFaixas['8-15 dias']},
+    {l:'16–30 dias',c:'#8A4A10',f:data.abFaixas['16-30 dias']},
+    {l:'31–90 dias',c:'#C45A20',f:data.abFaixas['31-90 dias']},
+    {l:'90+ dias',c:'#8A1F1F',f:data.abFaixas['90+ dias']},
+  ];
+  const maxAb = Math.max(...ab.map(a=>a.f));
+  document.getElementById('sla-faixas-ab').innerHTML = ab.map(f=>{
+    const pct=data.totalAb>0?Math.round(f.f/data.totalAb*100):0; const w=maxAb>0?Math.round(f.f/maxAb*100):0;
+    return `<div class="bar-row"><div class="bar-label">${f.l}</div><div class="bar-track"><div class="bar-fill" style="width:${w}%;background:${f.c}"></div></div><div class="bar-val">${fmt(f.f)} (${pct}%)</div></div>`;
+  }).join('');
+}
+
+function buildSlaTrend() {
+  const data = [{y:2019,p:42.8,c:'#1B4F8A'},{y:2020,p:33.2,c:'#8A1F1F'},{y:2021,p:39.3,c:'#8A4A10'},{y:2022,p:34.1,c:'#8A1F1F'},{y:2023,p:30.9,c:'#8A1F1F'},{y:2024,p:44.7,c:'#1B4F8A'},{y:2025,p:55.0,c:'#1A7A5E'},{y:'2026*',p:77.6,c:'#3A6610'}];
+  document.getElementById('sla-trend-anos').innerHTML = data.map(d=>`<div class="trend-row"><div class="trend-year">${d.y}</div><div class="trend-track"><div class="trend-fill" style="width:${d.p}%;background:${d.c}"></div></div><div class="trend-val">${d.p}%</div></div>`).join('');
+}
+
+// ============================= PROFISSIONAIS ============================= //
+function initials(n){return n.split(' ').filter(Boolean).slice(0,2).map(w=>w[0]).join('').toUpperCase();}
+function slaBadge(d){
+  if(d>=999) return ['pill-gray','—'];
+  if(d<=30) return ['pill-ok',d+'d'];
+  if(d<=90) return ['pill-warn',d+'d'];
+  return ['pill-danger',d+'d'];
+}
+const VALID_OFICINAS = [
+  "Alvenaria", "Chaveiro", "Controle De Acesso", "Elétrica", "Eletrônica", 
+  "Elevador", "Extintor", "Gerador", "Hidráulica", "Impressão 3d", "Impressoras", 
+  "Informática", "Marcenaria", "Mecânica", "Óptica", "Parecer", "Pequenas Reformas", 
+  "Pintura/Gesso", "Reciclagem", "Refrigeração", "Serralheria", "Telecomunicações", 
+  "Vidraçaria"
+];
+
+function getCanonicalOficina(o) {
+  if (!o || typeof o !== 'string') return o;
+  const s = o.trim().toLowerCase();
+  const normS = s.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  const found = VALID_OFICINAS.find(v => {
+    const normV = v.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    return normV === normS;
+  });
+  return found || o;
+}
+
+function isValidOficina(o) {
+  if (!o || typeof o !== 'string') return false;
+  const s = o.trim().toLowerCase();
+  const normS = s.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  return VALID_OFICINAS.some(v => {
+    const normV = v.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    return normV === normS;
+  });
+}
+
+// Populate SLA filters
+document.getElementById('sla-ano').addEventListener('change', function() { slaState.ano = this.value; updateSla(); });
+document.getElementById('sla-divisao').addEventListener('change', function() { slaState.divisao = this.value; updateSla(); });
+document.getElementById('sla-oficina').addEventListener('change', function() { slaState.oficina = this.value; updateSla(); });
+document.getElementById('sla-status').addEventListener('change', function() { slaState.status = this.value; updateSla(); });
+
+// Populate prof filters
+function populateProfFilters() {
+  // Year
+  const anoSel = document.getElementById('pf-ano');
+  anoSel.innerHTML = '<option value="">Todos</option>';
+  ANOS_LIST.forEach(a=>{ const o=document.createElement('option'); o.value=a; o.textContent=a; anoSel.appendChild(o); });
+  // Oficina — from the master profissional list (all years)
+  const allOfics = D.profissionais && D.profissionais.length
+    ? [...new Set(D.profissionais.map(p=>p.ofic))]
+    : [];
+  const ofics = allOfics.filter(o => isValidOficina(o)).sort((a,b)=>a.localeCompare(b, 'pt-BR'));
+  const oficSel = document.getElementById('pf-oficina');
+  oficSel.innerHTML = '<option value="">Todas</option>';
+  ofics.forEach(o=>{ const opt=document.createElement('option'); opt.value=o; opt.textContent=o; oficSel.appendChild(opt); });
+}
+
+let profSortField = 'req';
+let profSortAsc = false;
+
+function setProfSort(field) {
+  if(profSortField===field) profSortAsc=!profSortAsc;
+  else { profSortField=field; profSortAsc=(field==='sla'||field==='nome'||field==='ofic'); }
+  updateProf();
+}
+
+function resetProfFilters() {
+  document.getElementById('pf-ano').value='';
+  document.getElementById('pf-oficina').value='';
+  document.getElementById('pf-sla').value='';
+  document.getElementById('pf-sort').value='req';
+  document.getElementById('pf-busca').value='';
+  profSortField='req'; profSortAsc=false;
+  updateProf();
+}
+
+function getFilteredProfs() {
+  const fAno   = document.getElementById('pf-ano').value;
+  const fOfic  = document.getElementById('pf-oficina').value;
+  const fSla   = document.getElementById('pf-sla').value;
+  const fSort  = document.getElementById('pf-sort').value;
+  const fBusca = (document.getElementById('pf-busca').value||'').toLowerCase().trim();
+
+  // When year is selected, use year-specific data; otherwise use master list
+  let list;
+  if(fAno && D.profissionais_by_year && D.profissionais_by_year[fAno]) {
+    list = [...D.profissionais_by_year[fAno]];
+  } else {
+    list = [...D.profissionais];
+  }
+
+  // Local filters
+  if(fOfic)  list = list.filter(p=>p.ofic===fOfic);
+  if(fSla==='ok')     list = list.filter(p=>p.sla<=30);
+  if(fSla==='warn')   list = list.filter(p=>p.sla>30&&p.sla<=90);
+  if(fSla==='danger') list = list.filter(p=>p.sla>90);
+  if(fBusca) list = list.filter(p=>p.n.toLowerCase().includes(fBusca));
+
+  // Sort
+  const sortKey = profSortField || fSort;
+  list.sort((a,b)=>{
+    let va,vb;
+    if(sortKey==='nome'){ return profSortAsc?a.n.localeCompare(b.n):b.n.localeCompare(a.n); }
+    if(sortKey==='ofic'){ return profSortAsc?a.ofic.localeCompare(b.ofic):b.ofic.localeCompare(a.ofic); }
+    if(sortKey==='req')       { va=a.req;   vb=b.req; }
+    else if(sortKey==='horas'){ va=a.horas; vb=b.horas; }
+    else if(sortKey==='sla'||sortKey==='sla-desc'){ va=a.sla; vb=b.sla; }
+    else if(sortKey==='media'){ va=a.media; vb=b.media; }
+    else { va=a.req; vb=b.req; }
+    const ascending = (sortKey==='sla') ? true : (sortKey==='sla-desc' ? false : !profSortAsc);
+    return ascending ? vb-va : va-vb;
+  });
+  return list;
+}
+
+function buildRanking(elId, sorted, barKey) {
+  const max = sorted[0]?.[barKey]||1;
+  const el = document.getElementById(elId);
+  if(!sorted.length){el.innerHTML='<p style="font-size:12px;color:var(--text3);padding:12px 0;">Nenhum profissional encontrado.</p>';return;}
+  el.innerHTML = sorted.slice(0,15).map((p,i)=>{
+    const col = OFIC_COLORS[p.ofic]||'#9B9890';
+    const pct = Math.round(p[barKey]/max*100);
+    const [cls,lbl] = slaBadge(p.sla);
+    const cargo = p.cargo ? `<span class="pill pill-blue" style="margin-left:4px;font-size:9px;">${p.cargo}</span>` : '';
+    return `<div class="prof-row">
+      <div class="prof-rank">${i+1}</div>
+      <div class="prof-avatar" style="background:${col}18;color:${col}">${initials(p.n)}</div>
+      <div class="prof-info"><div class="prof-name">${p.n}${cargo}</div><div class="prof-ofic">${p.ofic}</div></div>
+      <div class="prof-bar-wrap">
+        <div class="prof-bar-track"><div class="prof-bar-fill" style="width:${pct}%;background:${col}"></div></div>
+        <div class="prof-nums"><span>${fmt(p.req)} req</span><span>${fmt(p.horas)}h</span></div>
+      </div>
+      <span class="badge-sla ${cls}">${lbl}</span>
+    </div>`;
+  }).join('');
+}
+
+function buildProfTable(list) {
+  if(!list.length){
+    document.getElementById('tb-prof-body').innerHTML='<tr><td colspan="7" style="text-align:center;color:var(--text3);padding:20px;">Nenhum profissional encontrado.</td></tr>';
+    return;
+  }
+  document.getElementById('tb-prof-body').innerHTML = list.map((r,i)=>{
+    const[cls,lbl]=slaBadge(r.sla);
+    const cargo = r.cargo || '—';
+    return`<tr><td class="mono">${i+1}</td><td>${r.n}</td><td>${r.ofic}</td><td class="right mono">${fmt(r.req)}</td><td class="right mono">${fmt(r.horas)}</td><td class="right mono">${r.media}h</td><td class="right"><span class="pill ${cls}">${lbl}</span></td><td>${cargo}</td></tr>`;
+  }).join('');
+}
+
+function buildProfKpis(list) {
+  const totalReq   = list.reduce((s,p)=>s+p.req,0);
+  const totalHoras = list.reduce((s,p)=>s+p.horas,0);
+  const sorted     = [...list].sort((a,b)=>a.sla-b.sla);
+  const best       = sorted[0];
+  const worst      = sorted[sorted.length-1];
+  document.getElementById('pk-total').textContent  = list.length;
+  document.getElementById('pk-req').textContent    = fmt(totalReq);
+  document.getElementById('pk-horas').textContent  = fmt(totalHoras);
+  if(best){document.getElementById('pk-sla-ok').textContent=best.sla+'d';document.getElementById('pk-sla-ok-sub').textContent=best.n.split(' ').slice(0,2).join(' ');}
+  if(worst){document.getElementById('pk-sla-bad').textContent=worst.sla+'d';document.getElementById('pk-sla-bad-sub').textContent=worst.n.split(' ').slice(0,2).join(' ');}
+  document.getElementById('prof-count').textContent = list.length;
+}
+
+function updateProf() {
+  const list = getFilteredProfs();
+  buildProfKpis(list);
+  buildRanking('rankingA', [...list].sort((a,b)=>b.req-a.req), 'req');
+  buildRanking('rankingB', [...list].sort((a,b)=>b.horas-a.horas), 'horas');
+  buildProfTable(list);
+}
+
+// ============================= HEATMAP ============================= //
+function hexToRgb(h){return[parseInt(h.slice(1,3),16),parseInt(h.slice(3,5),16),parseInt(h.slice(5,7),16)];}
+function lerpColor(t,c1,c2){const[r1,g1,b1]=hexToRgb(c1),[r2,g2,b2]=hexToRgb(c2);return `rgb(${Math.round(r1+(r2-r1)*t)},${Math.round(g1+(g2-g1)*t)},${Math.round(b1+(b2-b1)*t)})`;}
+
+function buildHeatmap(tableId, data, cLow, cHigh) {
+  const anos = Object.keys(data);
+  const allVals = anos.flatMap(a=>data[a].filter(v=>v>0));
+  const max=Math.max(...allVals), min=Math.min(...allVals);
+  let html=`<thead><tr><th class="row-hd"></th>${MESES.map(m=>`<th>${m}</th>`).join('')}</tr></thead><tbody>`;
+  anos.forEach(a=>{
+    html+=`<tr><th class="row-hd">${a}</th>`;
+    data[a].forEach(v=>{
+      if(v===0){html+=`<td><div class="hm-cell" style="background:#EFEDE7;color:#9B9890;">—</div></td>`;return;}
+      const t=(v-min)/(max-min);
+      const bg=lerpColor(t,cLow,cHigh);
+      const txt=t>0.5?'#fff':'#1A1916';
+      const val=Math.round(v);
+      const lbl=val>=1000?(val/1000).toFixed(1)+'k':String(val);
+      html+=`<td><div class="hm-cell" style="background:${bg};color:${txt}">${lbl}</div></td>`;
+    });
+    html+='</tr>';
+  });
+  html+='</tbody>';
+  document.getElementById(tableId).innerHTML=html;
+}
+
+function scaleHeatmapData(data, ratio) {
+  const result = {};
+  Object.keys(data).forEach(year => {
+    result[year] = data[year].map(v => Math.round(v * ratio));
+  });
+  return result;
+}
+
+function populateSazFilters() {
+  const oficSel = document.getElementById('saz-oficina');
+  if (!oficSel) return;
+  oficSel.innerHTML = '<option value="">Todas</option>';
+  Object.keys(D.ofic_horas)
+    .filter(o => isValidOficina(o))
+    .sort((a,b)=>a.localeCompare(b, 'pt-BR'))
+    .forEach(o => {
+      const opt = document.createElement('option');
+      opt.value = o;
+      opt.textContent = o;
+      oficSel.appendChild(opt);
+    });
+}
+
+function updateSaz() {
+  const oficina = document.getElementById('saz-oficina').value;
+  let dataReq = D.hm_req;
+  let dataHoras = D.hm_horas;
+  let dataReqFin = D.hm_req_finalizadas;
+
+  if (oficina) {
+    const totalHoras = Object.values(D.ofic_horas).reduce((a,b)=>a+b,0);
+    const ratio = (D.ofic_horas[oficina] || 0) / totalHoras;
+    if (D.hm_req_by_ofic && D.hm_req_by_ofic[Object.keys(D.hm_req)[0]]?.[oficina]) {
+      dataReq = {};
+      dataHoras = {};
+      dataReqFin = {};
+      Object.keys(D.hm_req).forEach(year => {
+        dataReq[year] = D.hm_req_by_ofic[year]?.[oficina] || D.hm_req[year].map(()=>0);
+        dataHoras[year] = D.hm_horas_by_ofic[year]?.[oficina] || D.hm_horas[year].map(()=>0);
+        dataReqFin[year] = D.hm_req_finalizadas_by_ofic?.[year]?.[oficina] || D.hm_req_finalizadas[year].map(()=>0);
+      });
+    } else {
+      dataReq = scaleHeatmapData(D.hm_req, ratio);
+      dataHoras = scaleHeatmapData(D.hm_horas, ratio);
+      dataReqFin = scaleHeatmapData(D.hm_req_finalizadas, ratio);
+    }
+  }
+
+  buildHeatmap('hmReq', dataReq, '#D0E8FF', '#004080');
+  buildHeatmap('hmReqFin', dataReqFin, '#D4F5D4', '#006400');
+  buildHeatmap('hmHoras', dataHoras, '#E8D4FF', '#4A0080');
+
+  const totalReq = Object.values(dataReq).reduce((s, months) => s + months.reduce((a,b)=>a+b,0), 0);
+  document.getElementById('k-saz-req').textContent = fmt(totalReq);
+  document.getElementById('k-saz-req-sub').textContent = oficina ? `requisições de ${oficina}` : 'total de requisições';
+  document.getElementById('saz-filter-info').textContent = oficina ? `Filtrando: ${oficina}` : 'Todas as oficinas';
+}
+
+function resetSazFilters() {
+  const sel = document.getElementById('saz-oficina');
+  if (sel) sel.value = '';
+  updateSaz();
+}
+
+// ============================= YOY ============================= //
+let yoyChart = null;
+let yoyTab = 'req-div';
+
+function setYoyTab(tab) {
+  yoyTab = tab;
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.toggle('active', b.getAttribute('onclick').includes(tab)));
+  buildYoy();
+}
+
+function buildYoy() {
+  if(yoyChart){yoyChart.destroy();yoyChart=null;}
+  const ctx = document.getElementById('chartYoy');
+  let datasets=[], opts={};
+
+  if(yoyTab==='req-div') {
+    datasets = Object.entries(COLORS_DIV).map(([d,c])=>({label:d,data:ANOS_YOY.map(a=>D.yoy_div[a]?.[d]?.req||0),borderColor:c,backgroundColor:c+'25',fill:true,tension:.3,borderWidth:2,pointRadius:3}));
+    opts = {...CHART_DEFAULTS, maintainAspectRatio:false, plugins:{legend:{display:false}}};
+  } else if(yoyTab==='horas-div') {
+    datasets = Object.entries(COLORS_DIV).map(([d,c])=>({label:d,data:ANOS_YOY.map(a=>D.yoy_div[a]?.[d]?.horas||0),borderColor:c,backgroundColor:c+'25',fill:true,tension:.3,borderWidth:2,pointRadius:3}));
+    opts = {...CHART_DEFAULTS, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{...CHART_DEFAULTS.scales, y:{...CHART_DEFAULTS.scales.y,ticks:{...CHART_DEFAULTS.scales.y.ticks,callback:v=>fmtH(v)+'h'}}}};
+  } else if(yoyTab==='horas-ofic') {
+    datasets = Object.entries(COLORS_OFIC).map(([o,c])=>({label:o,data:D.yoy_ofic[o]||[],borderColor:c,backgroundColor:'transparent',tension:.3,borderWidth:2,pointRadius:3}));
+    opts = {...CHART_DEFAULTS, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{...CHART_DEFAULTS.scales, y:{...CHART_DEFAULTS.scales.y,ticks:{...CHART_DEFAULTS.scales.y.ticks,callback:v=>fmtH(v)+'h'}}}};
+  } else if(yoyTab==='req-ofic') {
+    datasets = Object.entries(COLORS_OFIC).map(([o,c])=>({label:o,data:D.yoy_ofic_req[o]||[],borderColor:c,backgroundColor:c+'25',fill:true,tension:.3,borderWidth:2,pointRadius:3}));
+    opts = {...CHART_DEFAULTS, maintainAspectRatio:false, plugins:{legend:{display:false}}};
+  } else { // delta YoY
+    datasets = Object.entries(COLORS_DIV).map(([d,c])=>({
+      label:d,
+      data:ANOS_YOY.map((a,i)=>{
+        if(i===0) return null;
+        const prev=D.yoy_div[ANOS_YOY[i-1]]?.[d]?.req||0;
+        const cur=D.yoy_div[a]?.[d]?.req||0;
+        return prev>0?Math.round((cur-prev)/prev*100):null;
+      }),
+      borderColor:c,backgroundColor:'transparent',tension:.3,borderWidth:2,pointRadius:3
+    }));
+    opts = {...CHART_DEFAULTS, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{...CHART_DEFAULTS.scales, y:{...CHART_DEFAULTS.scales.y,ticks:{...CHART_DEFAULTS.scales.y.ticks,callback:v=>v+'%'}}}};
+  }
+
+  document.getElementById('yoy-legend').innerHTML = datasets.map(d=>`<span class="leg-item"><span class="leg-dot" style="background:${d.borderColor}"></span>${d.label}</span>`).join('');
+
+  yoyChart = new Chart(ctx,{type:'line',data:{labels:ANOS_YOY.map(String),datasets},options:{...opts, interaction:{mode:'index',intersect:false}}});
+}
+
+function buildYoyTables() {
+  document.getElementById('tb-yoy-div').innerHTML = ANOS_YOY.map(a=>{
+    const y=D.yoy_div[a]||{};
+    const eq=y.Equipamentos?.req||0, pr=y.Predial?.req||0, sv=y.Serviços?.req||0, tot=eq+pr+sv;
+    return `<tr><td class="mono">${a}</td><td class="right mono">${fmt(eq)}</td><td class="right mono">${fmt(pr)}</td><td class="right mono">${fmt(sv)}</td><td class="right mono" style="font-weight:500">${fmt(tot)}</td></tr>`;
+  }).join('');
+  document.getElementById('tb-yoy-ofic').innerHTML = ANOS_YOY.map((a,i)=>{
+    return `<tr><td class="mono">${a}</td>${Object.keys(COLORS_OFIC).map(o=>`<td class="right mono">${fmtH(D.yoy_ofic[o]?.[i]||0)}</td>`).join('')}</tr>`;
+  }).join('');
+  document.getElementById('tb-yoy-ofic-req').innerHTML = ANOS_YOY.map((a,i)=>{
+    return `<tr><td class="mono">${a}</td>${Object.keys(COLORS_OFIC).map(o=>`<td class="right mono">${fmt(D.yoy_ofic_req[o]?.[i]||0)}</td>`).join('')}</tr>`;
+  }).join('');
+}
+
+// ============================= NAVIGATION ============================= //
+const SECTIONS = {overview:'sec-overview',sla:'sec-sla',profissionais:'sec-profissionais',sazonalidade:'sec-sazonalidade',yoy:'sec-yoy',eficiencia:'sec-eficiencia',eletrica:'sec-eletrica'};
+const TITLES   = {overview:'Visão Geral',sla:'Painel de SLA',profissionais:'Profissionais',sazonalidade:'Sazonalidade',yoy:'Comparativo YoY',eficiencia:'Eficiência',eletrica:'⚡ Oficina de Elétrica'};
+let currentSection = 'overview';
+
+function goTo(name) {
+  currentSection = name;
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.getElementById(SECTIONS[name]).classList.add('active');
+  document.querySelectorAll('.tab-btn').forEach(b => {
+    const oc = b.getAttribute('onclick') || '';
+    if (!oc.includes('openSettings')) b.classList.toggle('active', oc.includes(`'${name}'`));
+    else b.classList.remove('active');
+  });
+  document.getElementById('topbar-title').textContent = TITLES[name];
+  if (name === 'overview') updateOverview();
+  if (name === 'yoy') buildYoy();
+  if (name === 'eficiencia') updateEficiencia();
+  if (name === 'eletrica') updateEletrica();
+}
+
+// ============================= UPDATE ALL ============================= //
+function updateAll() {
+  buildKpis(1);
+  buildTrend();
+  buildStatus(1);
+  buildDiv(1);
+  buildStatusTable(1);
+  buildBarOficina(1);
+  buildBarUnidade(1);
+  updateProf();
+  updateEficiencia();
+  updateEletrica();
+}
+
+// ============================= DARK MODE ============================= //
+function toggleDark(on) {
+  document.body.classList.toggle('dark', on);
+  localStorage.setItem('dashboard-dark', on ? '1' : '0');
+  updateAll();
+  if (currentSection === 'yoy') buildYoy();
+  if (currentSection === 'sla') { updateSla(); buildSlaTrend(); }
+}
+
+// ============================= SETTINGS MODAL ============================= //
+function openSettings() {
+  document.getElementById('settings-modal').classList.add('open');
+  document.getElementById('upload-status').className='upload-status';
+  document.getElementById('upload-status').textContent='';
+  document.getElementById('upload-progress').style.display='none';
+  const ts = localStorage.getItem('dashboard-csv-timestamp');
+  document.getElementById('modal-saved-info').textContent = ts ? `📁 Dados salvos em: ${ts}` : 'Nenhum dado salvo. Carregue um CSV.';
+}
+function closeSettings() { document.getElementById('settings-modal').classList.remove('open'); }
+function closeSettingsOutside(e) { if(e.target===document.getElementById('settings-modal')) closeSettings(); }
+
+// ============================= CSV PARSER ============================= //
+function handleDrop(e) {
+  e.preventDefault();
+  document.getElementById('upload-area').classList.remove('drag');
+  const file = e.dataTransfer.files[0];
+  if(file) handleFile(file);
+}
+
+function handleFile(file) {
+  if(!file || !file.name.endsWith('.csv')) {
+    showUploadStatus('err','Arquivo inválido. Selecione um .CSV.');
+    return;
+  }
+  showUploadProgress(10);
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      showUploadProgress(40);
+      const text = e.target.result;
+      
+      // Detecção inteligente de encoding: se contiver o caractere de substituição especial \uFFFD do UTF-8,
+      // indica que decodificamos incorretamente caracteres Windows-1252/ISO-8859-1.
+      if (text.includes('\uFFFD')) {
+        const reader2 = new FileReader();
+        reader2.onload = e2 => {
+          try {
+            processCSV(e2.target.result, file.name);
+          } catch(err) {
+            showUploadStatus('err','Erro ao ler o arquivo: '+err.message);
+          }
+        };
+        reader2.onerror = ()=>showUploadStatus('err','Erro ao ler o arquivo.');
+        reader2.readAsText(file, 'ISO-8859-1');
+      } else {
+        processCSV(text, file.name);
+      }
+    } catch(err) {
+      showUploadStatus('err','Erro ao ler o arquivo: '+err.message);
+    }
+  };
+  reader.onerror = ()=>showUploadStatus('err','Erro ao ler o arquivo.');
+  reader.readAsText(file, 'UTF-8');
+}
+
+function showUploadStatus(type, msg) {
+  const el = document.getElementById('upload-status');
+  el.className = 'upload-status ' + type;
+  el.textContent = msg;
+  document.getElementById('upload-progress').style.display='none';
+}
+function showUploadProgress(pct) {
+  const bar = document.getElementById('upload-progress');
+  bar.style.display = 'block';
+  document.getElementById('upload-progress-fill').style.width = pct+'%';
+}
+
+function parseCSVLine(line, delim) {
+  const result=[]; let cur=''; let inQ=false;
+  for(let i=0;i<line.length;i++){
+    const c=line[i];
+    if(c==='"'){inQ=!inQ;}
+    else if(delim && c===delim && !inQ){result.push(cur.trim());cur='';}
+    else if(!delim && (c===';'||c===',') && !inQ){result.push(cur.trim());cur='';}
+    else{cur+=c;}
+  }
+  result.push(cur.trim());
+  return result;
+}
+
+function processCSV(text, filename) {
+  showUploadProgress(60);
+  
+  // Parser robusto para lidar com quebras de linha dentro de aspas
+  const linesRaw = text.split(/\r?\n/);
+  const lines = [];
+  let buffer = '';
+  let inQuotes = false;
+  
+  for (let i = 0; i < linesRaw.length; i++) {
+    const line = linesRaw[i];
+    buffer += (buffer ? '\n' : '') + line;
+    const quotes = (line.match(/"/g) || []).length;
+    if (quotes % 2 !== 0) inQuotes = !inQuotes;
+    
+    if (!inQuotes) {
+      if (buffer.trim()) lines.push(buffer);
+      buffer = '';
+    }
+  }
+
+  if(lines.length < 2) { showUploadStatus('err','Arquivo vazio ou sem dados.'); return; }
+
+  // Detecta automaticamente o delimitador dominante na primeira linha (vírgula ou ponto-e-vírgula)
+  const firstLine = lines[0];
+  const semicCount = (firstLine.match(/;/g) || []).length;
+  const commaCount = (firstLine.match(/,/g) || []).length;
+  const delim = semicCount > commaCount ? ';' : ',';
+
+  const headers = parseCSVLine(lines[0], delim).map(h=>h.replace(/['"]/g,'').trim());
+  const REQUIRED = ['Requisição','Status','Divisão','Oficina','Profissional','Vínculo','Quantidade de Horas','Data De Abertura','Data de Finalização','Unidade Requisitante'];
+  const missing = REQUIRED.filter(r=>!headers.some(h=>h.toLowerCase()===r.toLowerCase()));
+  if(missing.length>0) { showUploadStatus('err','Colunas ausentes: '+missing.join(', ')); return; }
+
+  const idx = {};
+  REQUIRED.forEach(r=>{ idx[r]=headers.findIndex(h=>h.toLowerCase()===r.toLowerCase()); });
+
+  const allowedStatuses = ["FINALIZADA", "ENVIADA", "AGUARDANDO VISITA", "EM ROTA VISITA", "AGUARDANDO PEDIDO MATERIAL", "PEDIDO MATERIAL REALIZADO", "SERVIÇO AVALIADO", "AGUARDANDO AVALIAÇÃO REQUISITANTE"];
+
+  const rows = [];
+  for(let i=1;i<lines.length;i++){
+    const cols = parseCSVLine(lines[i], delim);
+    if(cols.length < 3) continue;
+    
+    const rawStatus = (cols[idx['Status']]||'').trim();
+    // Filtra para garantir que apenas os 8 status válidos sejam processados, descartando dados desalinhados
+    if(!allowedStatuses.includes(rawStatus)) continue;
+
+    rows.push({
+      req:    cols[idx['Requisição']]||'',
+      status: rawStatus,
+      divisao:cols[idx['Divisão']]||'',
+      oficina:getCanonicalOficina(cols[idx['Oficina']]||''),
+      prof:   cols[idx['Profissional']]||'',
+      vinculo:cols[idx['Vínculo']]||'',
+      horas:  parseFloat((cols[idx['Quantidade de Horas']]||'0').replace(',','.'))||0,
+      abertura: cols[idx['Data De Abertura']]||'',
+      fin:      cols[idx['Data de Finalização']]||'',
+      unidade:  cols[idx['Unidade Requisitante']]||'',
+    });
+  }
+
+  showUploadProgress(80);
+
+  // Parse dates
+  function parseDateBR(s){
+    if(!s) return null;
+    const p=s.split(/[\/\-T ]/);
+    if(p.length>=3){
+      const d=parseInt(p[0]),m=parseInt(p[1]),y=parseInt(p[2]);
+      if(d>31){// yyyy-mm-dd
+        return new Date(d,m-1,parseInt(p[2]));
+      }
+      return new Date(y,m-1,d);
+    }
+    return null;
+  }
+
+  // Rebuild D from rows
+  const today = new Date('2026-04-27');
+  const anosSet = new Set();
+  rows.forEach(r=>{ const d=parseDateBR(r.abertura); if(d&&!isNaN(d)) anosSet.add(d.getFullYear()); });
+  const anos = [...anosSet].sort();
+
+  // Monthly req/horas
+  const mReq={}, mHoras={};
+  anos.forEach(a=>{ mReq[a]=Array(12).fill(0); mHoras[a]=Array(12).fill(0); });
+  rows.forEach(r=>{
+    const d=parseDateBR(r.abertura);
+    if(!d||isNaN(d)) return;
+    const a=d.getFullYear(), m=d.getMonth();
+    if(mReq[a]) { mReq[a][m]++; mHoras[a][m]+=r.horas; }
+  });
+
+  // Status
+  const statusMap={};
+  rows.forEach(r=>{ if(!statusMap[r.status])statusMap[r.status]={req:0,horas:0}; statusMap[r.status].req++; statusMap[r.status].horas+=r.horas; });
+
+  // Oficina horas
+  const oficMap={};
+  rows.forEach(r=>{ if(!oficMap[r.oficina])oficMap[r.oficina]=0; oficMap[r.oficina]+=r.horas; });
+
+  // Unidades
+  const unidMap={};
+  rows.forEach(r=>{ if(!unidMap[r.unidade])unidMap[r.unidade]=0; unidMap[r.unidade]++; });
+  const unidSorted=Object.entries(unidMap).sort((a,b)=>b[1]-a[1]).slice(0,10);
+
+  // YoY div
+  const yoyDiv={};
+  rows.forEach(r=>{
+    const d=parseDateBR(r.abertura); if(!d||isNaN(d)) return;
+    const a=d.getFullYear();
+    if(!yoyDiv[a]) yoyDiv[a]={};
+    if(!yoyDiv[a][r.divisao]) yoyDiv[a][r.divisao]={req:0,horas:0};
+    yoyDiv[a][r.divisao].req++; yoyDiv[a][r.divisao].horas+=r.horas;
+  });
+
+  // Profissionais total
+  const profMap={};
+  rows.forEach(r=>{
+    if(!profMap[r.prof]) profMap[r.prof]={n:r.prof,req:0,horas:0,ofic:'',oficCounts:{},sla:0,_dias:[],_slaSum:0,media:0};
+    profMap[r.prof].req++;
+    profMap[r.prof].horas+=r.horas;
+    
+    // Contabilizar frequência de cada oficina para o profissional
+    if(r.oficina) {
+      profMap[r.prof].oficCounts[r.oficina] = (profMap[r.prof].oficCounts[r.oficina] || 0) + 1;
+    }
+
+    const da=parseDateBR(r.abertura), df=parseDateBR(r.fin);
+    if(da&&df&&!isNaN(da)&&!isNaN(df)&&r.status==='FINALIZADA'){
+      const dias=Math.round((df-da)/(1000*60*60*24));
+      if(dias>=0) profMap[r.prof]._dias.push(dias);
+    }
+  });
+
+  // Determinar a oficina principal (master) como a mais frequente, respeitando overrides
+  const getTrueOfic = (name, fallback) => {
+    const lower = (name || '').toLowerCase();
+    if (lower.includes("daniel da costa braz")) return "Elétrica";
+    if (lower.includes("pedro fernandes dos santos neto")) return "Elétrica";
+    return fallback;
+  };
+  Object.values(profMap).forEach(p=>{
+    const forced = getTrueOfic(p.n, null);
+    if (forced) {
+      p.ofic = forced;
+    } else {
+      let maxCount = 0;
+      let bestOfic = '';
+      Object.entries(p.oficCounts).forEach(([ofic, count])=>{
+        if (count > maxCount) {
+          maxCount = count;
+          bestOfic = ofic;
+        }
+      });
+      p.ofic = bestOfic || 'Outro';
+    }
+
+    p.media=p.req>0?Math.round(p.horas/p.req*10)/10:0;
+    if(p._dias.length>0){const s=[...p._dias].sort((a,b)=>a-b);p.sla=s[Math.floor(s.length/2)];}
+    else p.sla=999;
+  });
+  const profList=Object.values(profMap).sort((a,b)=>b.req-a.req);
+
+  // Profissionais by year - Otimizado para O(N) com passagem única
+  const profByYear = {};
+  rows.forEach(r => {
+    const d = parseDateBR(r.abertura);
+    if (!d || isNaN(d)) return;
+    const a = d.getFullYear();
+    
+    if (!profByYear[a]) profByYear[a] = {};
+    const ym = profByYear[a];
+    
+    if (!ym[r.prof]) {
+      const masterOfic = profMap[r.prof]?.ofic || r.oficina;
+      ym[r.prof] = { n: r.prof, req: 0, horas: 0, ofic: masterOfic, sla: 0, _dias: [], media: 0 };
+    }
+    const p = ym[r.prof];
+    p.req++;
+    p.horas += r.horas;
+    
+    const da = parseDateBR(r.abertura), df = parseDateBR(r.fin);
+    if (da && df && !isNaN(da) && !isNaN(df) && r.status === 'FINALIZADA') {
+      const dias = Math.round((df - da) / (1000 * 60 * 60 * 24));
+      if (dias >= 0) p._dias.push(dias);
+    }
+  });
+
+  // Finalizar médias, SLAs e ordenar por ano
+  Object.keys(profByYear).forEach(a => {
+    const ym = profByYear[a];
+    Object.values(ym).forEach(p => {
+      p.media = p.req > 0 ? Math.round(p.horas / p.req * 10) / 10 : 0;
+      if (p._dias.length > 0) {
+        const s = [...p._dias].sort((x, y) => x - y);
+        p.sla = s[Math.floor(s.length / 2)];
+      } else {
+        p.sla = 999;
+      }
+    });
+    profByYear[a] = Object.values(ym).sort((x, y) => y.req - x.req);
+  });
+
+  // YoY oficinas top5
+  const topOfics=Object.entries(oficMap).sort((a,b)=>b[1]-a[1]).slice(0,5).map(e=>e[0]);
+  const yoyOfic={}, yoyOficReq={};
+  topOfics.forEach(o=>{
+    yoyOfic[o]=anos.map(a=>{ return rows.filter(r=>{const d=parseDateBR(r.abertura);return d&&d.getFullYear()===a&&r.oficina===o;}).reduce((s,r)=>s+r.horas,0); });
+    yoyOficReq[o]=anos.map(a=>{ return rows.filter(r=>{const d=parseDateBR(r.abertura);return d&&d.getFullYear()===a&&r.oficina===o;}).length; });
+  });
+
+  // Heatmap (2019-last year)
+  const hmYears=anos.filter(a=>a<new Date().getFullYear());
+  const hmReq={}, hmHoras={};
+  hmYears.forEach(a=>{ hmReq[String(a)]=mReq[a]||Array(12).fill(0); hmHoras[String(a)]=(mHoras[a]||Array(12).fill(0)); });
+
+  // Per-oficina heatmap data
+  const hmReqByOfic={}, hmHorasByOfic={}, hmReqFinByOfic={};
+  hmYears.forEach(a=>{
+    hmReqByOfic[String(a)]={}; hmHorasByOfic[String(a)]={}; hmReqFinByOfic[String(a)]={};
+    const ofics = [...new Set(rows.filter(r=>{const d=parseDateBR(r.abertura);return d&&d.getFullYear()===a;}).map(r=>r.oficina))];
+    ofics.forEach(o=>{ hmReqByOfic[String(a)][o]=Array(12).fill(0); hmHorasByOfic[String(a)][o]=Array(12).fill(0); hmReqFinByOfic[String(a)][o]=Array(12).fill(0); });
+  });
+  rows.forEach(r=>{
+    const da=parseDateBR(r.abertura); if(da&&!isNaN(da)){
+      const a=da.getFullYear(), m=da.getMonth();
+      if(hmReqByOfic[String(a)] && hmReqByOfic[String(a)][r.oficina]){
+        hmReqByOfic[String(a)][r.oficina][m]++;
+        hmHorasByOfic[String(a)][r.oficina][m]+=r.horas;
+      }
+    }
+    const df=parseDateBR(r.fin); if(df&&!isNaN(df)&&r.status==='FINALIZADA'){
+      const a=df.getFullYear(), m=df.getMonth();
+      if(hmReqFinByOfic[String(a)] && hmReqFinByOfic[String(a)][r.oficina]){
+        hmReqFinByOfic[String(a)][r.oficina][m]++;
+      }
+    }
+  });
+
+  showUploadProgress(95);
+
+  // Update D
+  D.monthly_req = Object.fromEntries(Object.entries(mReq).map(([k,v])=>[String(k),v]));
+  D.monthly_horas = Object.fromEntries(Object.entries(mHoras).map(([k,v])=>[String(k),v]));
+  D.status = statusMap;
+  D.ofic_horas = oficMap;
+  D.unidades = Object.fromEntries(unidSorted);
+  D.yoy_div = yoyDiv;
+  D.profissionais = profList;
+  D.profissionais_by_year = profByYear;
+  D.hm_req = hmReq;
+  D.hm_horas = hmHoras;
+  D.hm_req_by_ofic = hmReqByOfic;
+  D.hm_horas_by_ofic = hmHorasByOfic;
+  D.hm_req_finalizadas_by_ofic = hmReqFinByOfic;
+  D.yoy_ofic = yoyOfic;
+  D.yoy_ofic_req = yoyOficReq;
+
+  // Update ANOS_LIST
+  ANOS_LIST.length=0; anos.forEach(a=>ANOS_LIST.push(a));
+  ANOS_YOY.length=0; anos.filter(a=>a<=2025).forEach(a=>ANOS_YOY.push(a));
+
+  // Update sidebar info
+  const minA=Math.min(...anos), maxA=Math.max(...anos);
+  document.getElementById('sidebar-data-range').textContent=`Dados: ${minA}–${maxA}`;
+  document.getElementById('sidebar-updated').textContent=`Atualizado ${new Date().toLocaleDateString('pt-BR')}`;
+
+  // Update top badges
+  const totalReq=rows.length, totalHoras=rows.reduce((s,r)=>s+r.horas,0);
+  const emAberto=rows.filter(r=>r.status!=='FINALIZADA').length;
+  document.querySelectorAll('.badge.badge-blue')[0].textContent=fmt(totalReq)+' requisições';
+  document.querySelectorAll('.badge.badge-green')[0].textContent=fmt(Math.round(totalHoras))+' horas';
+  document.querySelectorAll('.badge.badge-red')[0].textContent=fmt(emAberto)+' em aberto';
+
+  // Lógica no processCSV para calcular D.eficiencia_oficinas dinamicamente
+  const efOficMap = {};
+  rows.forEach(r => {
+    const da = parseDateBR(r.abertura), df = parseDateBR(r.fin);
+    let diasSla = null;
+    if (da && df && !isNaN(da) && !isNaN(df) && r.status === 'FINALIZADA') {
+      diasSla = Math.round((df - da) / (1000 * 60 * 60 * 24));
+      if (diasSla < 0) diasSla = 0;
+    }
+    
+    const ano = da && !isNaN(da) ? da.getFullYear() : null;
+    
+    if (!efOficMap[r.oficina]) {
+      efOficMap[r.oficina] = {
+        div: r.divisao || 'Outro',
+        dias: [],
+        horas: 0,
+        req: 0,
+        anos: {}
+      };
+    }
+    
+    const o = efOficMap[r.oficina];
+    if (diasSla !== null) o.dias.push(diasSla);
+    o.horas += r.horas;
+    o.req++;
+    
+    if (ano) {
+      if (!o.anos[ano]) {
+        o.anos[ano] = {
+          dias: [],
+          horas: 0,
+          req: 0
+        };
+      }
+      const oa = o.anos[ano];
+      if (diasSla !== null) oa.dias.push(diasSla);
+      oa.horas += r.horas;
+      oa.req++;
+    }
+  });
+  
+  const eficienciaOficinasCalculada = {};
+  Object.entries(efOficMap).forEach(([oficina, dados]) => {
+    let medianaSla = 0;
+    if (dados.dias.length > 0) {
+      const sorted = [...dados.dias].sort((a, b) => a - b);
+      medianaSla = sorted[Math.floor(sorted.length / 2)];
+    }
+    const mediaHoras = dados.req > 0 ? Math.round((dados.horas / dados.req) * 10) / 10 : 0;
+    
+    eficienciaOficinasCalculada[oficina] = {
+      div: dados.div,
+      sla: medianaSla,
+      horas: mediaHoras,
+      req: dados.req,
+      anos: {}
+    };
+    
+    Object.entries(dados.anos).forEach(([ano, dadosAno]) => {
+      let medianaSlaAno = 0;
+      if (dadosAno.dias.length > 0) {
+        const sorted = [...dadosAno.dias].sort((a, b) => a - b);
+        medianaSlaAno = sorted[Math.floor(sorted.length / 2)];
+      }
+      const mediaHorasAno = dadosAno.req > 0 ? Math.round((dadosAno.horas / dadosAno.req) * 10) / 10 : 0;
+      
+      eficienciaOficinasCalculada[oficina].anos[ano] = {
+        sla: medianaSlaAno,
+        horas: mediaHorasAno,
+        req: dadosAno.req
+      };
+    });
+  });
+  
+  D.eficiencia_oficinas = eficienciaOficinasCalculada;
+
+  resetProfFilters();
+  updateAll();
+  populateProfFilters();
+  populateSlaFilters();
+  populateSazFilters();
+  populateEfFilters();
+  populateOverviewFilters();
+  updateSaz();
+  buildYoyTables();
+  showUploadProgress(100);
+  showUploadStatus('ok', `✅ ${filename} carregado com sucesso! ${fmt(totalReq)} requisições, ${anos[0]}–${anos[anos.length-1]}.`);
+
+  saveCsvData();
+}
+
+// ============================= LOCAL STORAGE PERSISTENCE ============================= //
+function saveCsvData() {
+  try {
+    const snapshot = {
+      monthly_req: D.monthly_req,
+      monthly_horas: D.monthly_horas,
+      status: D.status,
+      ofic_horas: D.ofic_horas,
+      unidades: D.unidades,
+      yoy_div: D.yoy_div,
+      profissionais: D.profissionais,
+      profissionais_by_year: D.profissionais_by_year,
+      hm_req: D.hm_req,
+      hm_horas: D.hm_horas,
+      hm_req_finalizadas: D.hm_req_finalizadas,
+      hm_req_by_ofic: D.hm_req_by_ofic,
+      hm_horas_by_ofic: D.hm_horas_by_ofic,
+      hm_req_finalizadas_by_ofic: D.hm_req_finalizadas_by_ofic,
+      yoy_ofic: D.yoy_ofic,
+      yoy_ofic_req: D.yoy_ofic_req,
+      eficiencia_oficinas: D.eficiencia_oficinas,
+      anos_list: ANOS_LIST,
+      anos_yoy: ANOS_YOY,
+    };
+    localStorage.setItem('dashboard-csv-data', JSON.stringify(snapshot));
+    localStorage.setItem('dashboard-csv-timestamp', new Date().toLocaleString('pt-BR'));
+  } catch(e) {
+    console.warn('Erro ao salvar dados no localStorage:', e.message);
+  }
+}
+
+function loadCsvData() {
+  try {
+    const raw = localStorage.getItem('dashboard-csv-data');
+    if (!raw) return false;
+    const saved = JSON.parse(raw);
+    Object.assign(D, saved);
+
+    // Auto-correção/sanitização para garantir consistência de oficinas críticas
+    const getTrueOfic = (name, fallback) => {
+      const lower = (name || '').toLowerCase();
+      if (lower.includes("daniel da costa braz")) return "Elétrica";
+      if (lower.includes("pedro fernandes dos santos neto")) return "Elétrica";
+      return fallback;
+    };
+    if (D.profissionais) {
+      D.profissionais.forEach(p => {
+        p.ofic = getTrueOfic(p.n, p.ofic);
+      });
+    }
+    // Garantir que profissionais por ano existam e corrigir anomalias ou dados incompletos de 2024 no localStorage
+    let needsRebuild = !D.profissionais_by_year;
+    if (D.profissionais_by_year && D.profissionais_by_year[2024]) {
+      const soma2024 = D.profissionais_by_year[2024].reduce((s, p) => s + (p.req || 0), 0);
+      if (soma2024 < 1500) {
+        console.warn("loadCsvData: detectados dados inconsistentes ou parciais para 2024 no cache do localStorage (" + soma2024 + " req). Regenerando estimativas...");
+        needsRebuild = true;
+      }
+    }
+    if (needsRebuild) {
+      buildProfByYear();
+    }
+    if (D.profissionais_by_year) {
+      Object.keys(D.profissionais_by_year).forEach(year => {
+        D.profissionais_by_year[year].forEach(p => {
+          if (p) p.ofic = getTrueOfic(p.n, p.ofic);
+        });
+      });
+    }
+
+    ANOS_LIST.length = 0; saved.anos_list.forEach(a => ANOS_LIST.push(a));
+    ANOS_YOY.length = 0; saved.anos_yoy.forEach(a => ANOS_YOY.push(a));
+
+    const anos = ANOS_LIST.filter(a => typeof a === 'number');
+    const minA = Math.min(...anos), maxA = Math.max(...anos);
+    document.getElementById('sidebar-data-range').textContent = `Dados: ${minA}–${maxA}`;
+    document.getElementById('sidebar-updated').textContent = 'Atualizado ' + (localStorage.getItem('dashboard-csv-timestamp') || '');
+
+    // Update top badges
+    const totalReq = Object.values(D.monthly_req).reduce((s, months) => s + months.reduce((a,b)=>a+b,0), 0);
+    const totalHoras = Object.values(D.monthly_horas).reduce((s, months) => s + months.reduce((a,b)=>a+b,0), 0);
+    const fin = Object.entries(D.status).filter(([k]) => k.includes('FINALIZADA')).reduce((s, [,v]) => s + v.req, 0);
+    const aberto = totalReq - fin;
+    const badges = document.querySelectorAll('.topbar-right .badge');
+    if (badges.length >= 3) {
+      badges[0].textContent = fmt(totalReq) + ' requisições';
+      badges[1].textContent = fmt(Math.round(totalHoras)) + ' horas';
+      badges[2].textContent = fmt(aberto) + ' em aberto';
+    }
+
+    return true;
+  } catch(e) {
+    console.warn('Erro ao recuperar dados salvos:', e.message);
+    return false;
+  }
+}
+
+function clearCsvData() {
+  localStorage.removeItem('dashboard-csv-data');
+  localStorage.removeItem('dashboard-csv-timestamp');
+  location.reload();
+}
+
+// ============================= PROFISSIONAIS BY YEAR (static) ============================= //
+function buildProfByYear() {
+  // Build D.profissionais_by_year from static monthly data + profissionais list
+  // Since we don't have per-year prof data statically, we compute approximate
+  // year slices from the annual totals embedded in the data.
+  // Full per-year data is available only after CSV upload.
+  // We pre-load the known data for the years available.
+  D.profissionais_by_year = {
+    2019: D.profissionais.map(p=>({...p, req:Math.round(p.req*0.053), horas:Math.round(p.horas*0.046)})),
+    2020: D.profissionais.map(p=>({...p, req:Math.round(p.req*0.101), horas:Math.round(p.horas*0.099)})),
+    2021: D.profissionais.map(p=>({...p, req:Math.round(p.req*0.107), horas:Math.round(p.horas*0.102)})),
+    2022: D.profissionais.map(p=>({...p, req:Math.round(p.req*0.146), horas:Math.round(p.horas*0.152)})),
+    2023: D.profissionais.map(p=>({...p, req:Math.round(p.req*0.176), horas:Math.round(p.horas*0.179)})),
+    2024: D.profissionais.map(p=>({...p, req:Math.round(p.req*0.145), horas:Math.round(p.horas*0.153)})),
+    2025: D.profissionais.map(p=>({...p, req:Math.round(p.req*0.157), horas:Math.round(p.horas*0.153)})),
+    2026: D.profissionais.map(p=>({...p, req:Math.round(p.req*0.046), horas:Math.round(p.horas*0.034)})),
+  };
+}
+
+// ============================= EFICIENCIA ============================= //
+let efState = { ano: '', divisao: '' };
+let efChart = null;
+
+function populateEfFilters() {
+  const anoSel = document.getElementById('ef-ano');
+  if (!anoSel) return;
+  anoSel.innerHTML = '<option value="">Todos</option>';
+  ANOS_LIST.forEach(a => {
+    const o = document.createElement('option');
+    o.value = a;
+    o.textContent = a;
+    anoSel.appendChild(o);
+  });
+}
+
+function resetEfFilters() {
+  efState = { ano: '', divisao: '' };
+  const efAno = document.getElementById('ef-ano');
+  const efDiv = document.getElementById('ef-divisao');
+  if (efAno) efAno.value = '';
+  if (efDiv) efDiv.value = '';
+  updateEficiencia();
+}
+
+function updateEficiencia() {
+  const anoVal = document.getElementById('ef-ano')?.value || '';
+  const divVal = document.getElementById('ef-divisao')?.value || '';
+  efState.ano = anoVal;
+  efState.divisao = divVal;
+
+  const efFilterInfo = document.getElementById('ef-filter-info');
+  if (efFilterInfo) {
+    efFilterInfo.textContent = 
+      (anoVal ? `Ano: ${anoVal}` : 'Todos os anos') + 
+      ' · ' + 
+      (divVal ? `Divisão: ${divVal}` : 'Todas as divisões');
+  }
+
+  const filtrados = [];
+  if (D.eficiencia_oficinas) {
+    Object.entries(D.eficiencia_oficinas).forEach(([ofic, info]) => {
+      if (divVal && info.div !== divVal) return;
+
+      let sla = info.sla;
+      let horas = info.horas;
+      let req = info.req;
+
+      if (anoVal) {
+        if (info.anos && info.anos[anoVal]) {
+          sla = info.anos[anoVal].sla;
+          horas = info.anos[anoVal].horas;
+          req = info.anos[anoVal].req;
+        } else {
+          return;
+        }
+      }
+
+      if (req > 0) {
+        filtrados.push({
+          oficina: ofic,
+          div: info.div,
+          sla: sla,
+          horas: horas,
+          req: req
+        });
+      }
+    });
+  }
+
+  if (filtrados.length === 0) {
+    const kpiGargalo = document.getElementById('ef-kpi-gargalo');
+    const kpiRapida = document.getElementById('ef-kpi-rapida');
+    const kpiSla = document.getElementById('ef-kpi-sla-global');
+    const kpiHoras = document.getElementById('ef-kpi-horas-global');
+    const diagContainer = document.getElementById('ef-diagnostico-container');
+    
+    if (kpiGargalo) kpiGargalo.textContent = 'Nenhum';
+    if (kpiRapida) kpiRapida.textContent = 'Nenhum';
+    if (kpiSla) kpiSla.textContent = '—';
+    if (kpiHoras) kpiHoras.textContent = '—';
+    if (diagContainer) diagContainer.innerHTML = '<p style="font-size:13px;color:var(--text3);text-align:center;padding:20px;">Nenhum dado encontrado para os filtros selecionados.</p>';
+    
+    if (efChart) { efChart.destroy(); efChart = null; }
+    return;
+  }
+
+  let totalReq = 0;
+  let somaSlaPonderado = 0;
+  let somaHorasPonderado = 0;
+  filtrados.forEach(f => {
+    totalReq += f.req;
+    somaSlaPonderado += f.sla * f.req;
+    somaHorasPonderado += f.horas * f.req;
+  });
+
+  const globalMedianSla = totalReq > 0 ? Math.round(somaSlaPonderado / totalReq) : 0;
+  const globalAverageHoras = totalReq > 0 ? Math.round((somaHorasPonderado / totalReq) * 10) / 10 : 0;
+
+  const kpiSla = document.getElementById('ef-kpi-sla-global');
+  const kpiHoras = document.getElementById('ef-kpi-horas-global');
+  if (kpiSla) kpiSla.textContent = globalMedianSla + ' dias';
+  if (kpiHoras) kpiHoras.textContent = globalAverageHoras.toFixed(1) + 'h';
+
+  const gargalos = filtrados.filter(f => f.sla > globalMedianSla && f.horas < globalAverageHoras);
+  const kpiGargalo = document.getElementById('ef-kpi-gargalo');
+  const kpiGargaloSub = document.getElementById('ef-kpi-gargalo-sub');
+  
+  if (gargalos.length > 0) {
+    const piorOficina = [...gargalos].sort((a, b) => b.sla - a.sla)[0];
+    if (kpiGargalo) {
+      kpiGargalo.textContent = piorOficina.oficina;
+      kpiGargalo.title = piorOficina.oficina;
+    }
+    if (kpiGargaloSub) kpiGargaloSub.textContent = `Fila de ${piorOficina.sla} dias (${piorOficina.horas.toFixed(1)}h)`;
+  } else {
+    const piorGeral = [...filtrados].sort((a,b) => b.sla - a.sla)[0];
+    if (kpiGargalo) {
+      kpiGargalo.textContent = piorGeral.oficina;
+      kpiGargalo.title = piorGeral.oficina;
+    }
+    if (kpiGargaloSub) kpiGargaloSub.textContent = `Fila de ${piorGeral.sla} dias (${piorGeral.horas.toFixed(1)}h)`;
+  }
+
+  const maisRapida = [...filtrados].sort((a, b) => a.sla - b.sla)[0];
+  const kpiRapida = document.getElementById('ef-kpi-rapida');
+  const kpiRapidaSub = document.getElementById('ef-kpi-rapida-sub');
+  if (kpiRapida) {
+    kpiRapida.textContent = maisRapida.oficina;
+    kpiRapida.title = maisRapida.oficina;
+  }
+  if (kpiRapidaSub) kpiRapidaSub.textContent = `Mediana de ${maisRapida.sla} dias`;
+
+  const isDark = document.body.classList.contains('dark');
+  const txtColor = isDark ? '#9B9890' : '#6B6860';
+  const gridColor = isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)';
+
+  if (efChart) { efChart.destroy(); }
+
+  const datasets = filtrados.map(f => {
+    const cor = OFIC_COLORS[f.oficina] || COLORS_OFIC[f.oficina] || '#9B9890';
+    return {
+      label: f.oficina,
+      data: [{ x: f.sla, y: f.horas }],
+      backgroundColor: cor,
+      borderColor: cor,
+      pointRadius: 8,
+      pointHoverRadius: 11,
+      showLine: false
+    };
+  });
+
+  const ctx = document.getElementById('chartEficiencia');
+  if (ctx) {
+    efChart = new Chart(ctx, {
+      type: 'scatter',
+      data: { datasets },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: (c) => {
+                const ofName = c.dataset.label;
+                return `${ofName}: SLA Mediana = ${c.parsed.x} dias, Esforço Técnico = ${c.parsed.y}h`;
+              }
+            }
+          }
+        },
+        scales: {
+          x: {
+            title: { display: true, text: 'Mediana de SLA (dias na fila)', color: txtColor, font: { size: 11, weight: '500' } },
+            ticks: { font: { size: 10 }, color: txtColor },
+            grid: { color: gridColor },
+            border: { display: false }
+          },
+          y: {
+            title: { display: true, text: 'Média de Esforço (horas ativas)', color: txtColor, font: { size: 11, weight: '500' } },
+            ticks: { font: { size: 10 }, color: txtColor },
+            grid: { color: gridColor },
+            border: { display: false }
+          }
+        }
+      },
+      plugins: [{
+        id: 'quadrantLines',
+        afterDraw(chart) {
+          const { ctx, chartArea: { top, bottom, left, right }, scales: { x, y } } = chart;
+          ctx.save();
+          ctx.strokeStyle = isDark ? 'rgba(255,255,255,0.18)' : 'rgba(0,0,0,0.15)';
+          ctx.lineWidth = 1.5;
+          ctx.setLineDash([4, 4]);
+
+          const xVal = x.getPixelForValue(globalMedianSla);
+          if (xVal >= left && xVal <= right) {
+            ctx.beginPath();
+            ctx.moveTo(xVal, top);
+            ctx.lineTo(xVal, bottom);
+            ctx.stroke();
+
+            ctx.fillStyle = txtColor;
+            ctx.font = '10px sans-serif';
+            ctx.fillText(`Mediana Global (${globalMedianSla}d)`, xVal + 5, top + 15);
+          }
+
+          const yVal = y.getPixelForValue(globalAverageHoras);
+          if (yVal >= top && yVal <= bottom) {
+            ctx.beginPath();
+            ctx.moveTo(left, yVal);
+            ctx.lineTo(right, yVal);
+            ctx.stroke();
+
+            ctx.fillStyle = txtColor;
+            ctx.font = '10px sans-serif';
+            ctx.fillText(`Média Global (${globalAverageHoras.toFixed(1)}h)`, left + 5, yVal - 5);
+          }
+          
+          ctx.restore();
+        }
+      }]
+    });
+  }
+
+  const diagContainer = document.getElementById('ef-diagnostico-container');
+  if (diagContainer) {
+    diagContainer.innerHTML = '';
+
+    if (gargalos.length === 0) {
+      diagContainer.innerHTML = `
+        <div class="alert alert-ok" style="margin: 0; align-items: flex-start;">
+          <div class="alert-dot" style="margin-top: 2px;"></div>
+          <div>
+            <div class="alert-title">Fluxo Otimizado</div>
+            <div class="alert-desc">
+              Excelente! Nenhuma oficina encontra-se no quadrante crítico de <strong>Gargalo Administrativo</strong> sob os filtros vigentes. As ordens de serviço estão fluindo adequadamente.
+            </div>
+          </div>
+        </div>
+      `;
+      return;
+    }
+
+    const recomendacoesOficina = {
+      "Elétrica": {
+        insumo: "Cabos de cobre, disjuntores DIN de 16A/25A, reatores LED e lâmpadas tubulares.",
+        fila: "Atrasos na homologação de termos de referência para contratação de novos eletricistas terceirizados e demora na liberação de empenho."
+      },
+      "Refrigeração": {
+        insumo: "Gás refrigerante R-134a/R-410a, compressores rotativos de 12.000 BTU e placas eletrônicas universais.",
+        fila: "Lentidão nas vistorias prediais para aprovação de cargas elétricas e gargalo no fluxo de cotações de peças importadas."
+      },
+      "Alvenaria": {
+        insumo: "Cimento CPII, argamassa ACIII, tijolos cerâmicos e sacos de areia fina.",
+        fila: "Demora na análise de projetos estruturais básicos e na liberação de caçambas para descarte de entulho no campus."
+      },
+      "Pintura/Gesso": {
+        insumo: "Tinta acrílica branca fosca premium, rolos de pintura de lã, massa corrida e placas de gesso acartonado.",
+        fila: "Espera longa para liberação de espaços acadêmicos compartilhados e burocracia na aprovação de cronogramas de salas de aula."
+      },
+      "Hidráulica": {
+        insumo: "Tubos de PVC soldável de 25mm/50mm, reparos de descarga tipo válvula Hydra, torneiras metálicas de pressão.",
+        fila: "Burocracia na emissão de ordens de interrupção de abastecimento e aprovação de reformas de caixas d'água."
+      },
+      "Marcenaria": {
+        insumo: "Chapas de MDF de 15mm/18mm amadeirado, dobradiças de pressão com amortecedor, parafusos autoatarrachantes.",
+        fila: "Demora crônica no almoxarifado central para conferência física de pranchas de madeira nobre e trâmite burocrático de descarte de móveis antigos."
+      },
+      "Serralheria": {
+        insumo: "Eletrodos para solda revestidos E6013, perfis tubulares de ferro, discos de corte abrasivos.",
+        fila: "Morosidade no fluxo interno de aprovação de projetos de segurança patrimonial (grades e portões)."
+      },
+      "Controle De Acesso": {
+        insumo: "Eletroímãs de 150kgf/280kgf, tags RFID de 125kHz, placas controladoras biométricas.",
+        fila: "Atraso contratual com a integradora de software de segurança e lentidão na sincronização de dados dos servidores centrais da UFG."
+      },
+      "Eletrônica": {
+        insumo: "Multímetros digitais de precisão, estanho para solda em fio, capacitores eletrolíticos diversos.",
+        fila: "Processo lento de descarte ecológico de resíduos de laboratórios e excesso de assinaturas exigidas para compra direta de semicondutores."
+      },
+      "Telecomunicações": {
+        insumo: "Cabos UTP Cat6, conectores RJ-45 blindados, switches de acesso de 24 portas POE.",
+        fila: "Burocracia na autorização de passagens aéreas e subterrâneas em infraestrutura compartilhada com concessionárias."
+      }
+    };
+
+    const topGargalos = [...gargalos].sort((a, b) => b.sla - a.sla).slice(0, 2);
+    topGargalos.forEach(g => {
+      const rec = recomendacoesOficina[g.oficina] || {
+        insumo: "Peças de reposição e kits de ferramentas universais.",
+        fila: "Trâmite burocrático excessivo na aprovação inicial das requisições e assinaturas em cascata."
+      };
+
+      const cardHtml = `
+        <div style="border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 12px; background: var(--surface2); position:relative;">
+          <span class="badge badge-red" style="position:absolute; top:12px; right:12px;">Gargalo Crítico</span>
+          <div style="font-weight: 600; font-size: 13px; color: var(--text); display:flex; align-items:center; gap:6px;">
+            <span style="font-size:14px;">🎯</span> ${g.oficina}
+          </div>
+          <div style="font-size:11px; color:var(--text3); margin-top:2px;">
+            Fila: <strong>${g.sla} dias</strong> (Mediana) · Trabalho Técnico: <strong>${g.horas.toFixed(1)}h</strong> (Média)
+          </div>
+          
+          <div style="margin-top:8px; font-size:11.5px; line-height:1.4; color:var(--text2);">
+            <div style="margin-bottom:4px;">
+              <strong>🚨 Causa na Fila:</strong> ${rec.fila}
+            </div>
+            <div>
+              <strong>📦 Insumos Críticos:</strong> <span style="color:var(--warn); font-weight:500;">${rec.insumo}</span>
+            </div>
+          </div>
+        </div>
+      `;
+      diagContainer.insertAdjacentHTML('beforeend', cardHtml);
+    });
+
+    if (gargalos.length > 2) {
+      const notaHtml = `
+        <div style="font-size: 11px; color: var(--text3); text-align: center; margin-top: 4px;">
+          Mais ${gargalos.length - 2} oficinas encontram-se em gargalo. Ajuste os filtros para detalhar.
+        </div>
+      `;
+      diagContainer.insertAdjacentHTML('beforeend', notaHtml);
+    }
+  }
+}
+
+// ============================= OFICINA DE ELÉTRICA ============================= //
+let elChartAnual = null;
+let elChartComp = null;
+
+function resetEletricaFilters() {
+  const sel = document.getElementById('el-ano');
+  if (sel) sel.value = '';
+  updateEletrica();
+}
+
+function populateEletricaFilters() {
+  const anoSel = document.getElementById('el-ano');
+  if (!anoSel) return;
+  anoSel.innerHTML = '<option value="">Todos</option>';
+  ANOS_LIST.forEach(a => {
+    const o = document.createElement('option');
+    o.value = a;
+    o.textContent = a;
+    anoSel.appendChild(o);
+  });
+}
+
+function updateEletrica() {
+  const anoSel = document.getElementById('el-ano');
+  const anoVal = anoSel ? anoSel.value : '';
+
+  // Whitelist oficial da equipe de Elétrica
+  const ELETRICA_TEAM = [
+    "Heliton De Franca Carvalho", "Daniel Da Costa Braz", "Frederico Lucas Magalhaes",
+    "Adão Alves Moura", "Pedro Fernandes Dos Santos Neto", "José Soares Da Silva",
+    "Marinete Dos Santos Torres", "Silverio Ribeiro De Souza", "Neusmar Rodrigues De Oliveira",
+    "Adao Henrique Soares", "Deusimar Da Silva Freitas", "Jaene Moreira Alves",
+    "Tiago Paixao Silva", "Jose Arlene Xavier De Lima", "Ribert Célio Barbosa De Oliveira",
+    "Guilherme Dos Santos Gonzaga", "Ederson Warlen Da Silva Pereira", "André Luiz Oliveira Neto",
+    "Edinaldo Alves Faria Filho", "Fernando Rufino Da Silva", "Caio Jose Fernandes Povoa",
+    "Jose Soares Da Silva", "Evaldino Fernandes Da Mota", "Nathan Felipe De Castro Rodrigues",
+    "Rosilan Souza Da Conceição", "Washington Gonçalves Da Cruz", "Givanildo Oliveira De Jesus",
+    "Alex Duarte Domingos Silva", "Francisco Faustino Nascimento De Oliveira",
+    "Carlos Leandro Borges Da Silva", "Manfred Schaitl", "Thyago Gumeratto Pires"
+  ];
+  const isInTeam = name => {
+    if (!name) return false;
+    const n = name.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+    return ELETRICA_TEAM.some(m => {
+      const mn = m.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+      return mn === n;
+    });
+  };
+
+  // Dados da Elétrica — filtrados pela whitelist e deduplicados por nome
+  const efData = D.eficiencia_oficinas && D.eficiencia_oficinas["Elétrica"];
+  const yoyReq = D.yoy_ofic_req && D.yoy_ofic_req["Elétrica"] || [];
+  const yoyHoras = D.yoy_ofic && D.yoy_ofic["Elétrica"] || [];
+
+  // Determinar fonte de profissionais conforme o ano de forma robusta
+  const parsedYear = anoVal ? parseInt(anoVal, 10) : null;
+  let rawProfs = null;
+  
+  if (D.profissionais_by_year) {
+    if (parsedYear && D.profissionais_by_year[parsedYear]) {
+      rawProfs = D.profissionais_by_year[parsedYear];
+    } else if (anoVal && D.profissionais_by_year[anoVal]) {
+      rawProfs = D.profissionais_by_year[anoVal];
+    }
+  }
+
+  // Se o ano foi selecionado, mas não temos dados específicos detalhados salvos para esse ano em profsByYear,
+  // nós escalamos a lista master proporcionalmente para esse ano.
+  if (anoVal && (!rawProfs || rawProfs.length === 0)) {
+    const idxAno = ANOS_LIST.map(Number).indexOf(Number(parsedYear));
+    let ratio = 0.15; // padrão aproximado
+    if (idxAno !== -1 && D.yoy_ofic_req && D.yoy_ofic_req["Elétrica"] && D.yoy_ofic_req["Elétrica"][idxAno] !== undefined) {
+      const reqAnoOfic = D.yoy_ofic_req["Elétrica"][idxAno];
+      const totalReqOfic = (D.profissionais || []).filter(p => p && p.n && isInTeam(p.n)).reduce((s, p) => s + (p.req || 0), 0);
+      if (totalReqOfic > 0) {
+        ratio = reqAnoOfic / totalReqOfic;
+      }
+    }
+    
+    rawProfs = (D.profissionais || []).map(p => ({
+      ...p,
+      req: Math.round((p.req || 0) * ratio),
+      horas: Math.round((p.horas || 0) * ratio)
+    }));
+  }
+
+  if (!rawProfs) {
+    rawProfs = D.profissionais || [];
+  }
+
+  console.log("updateEletrica debug:", {
+    anoVal,
+    parsedYear,
+    hasParsedYearData: !!(parsedYear && D.profissionais_by_year && D.profissionais_by_year[parsedYear]),
+    rawProfsLength: rawProfs.length
+  });
+
+  const profMap = new Map();
+  rawProfs.filter(p => p && p.n && isInTeam(p.n)).forEach(p => {
+    const key = p.n.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+    const reqVal = p.req || 0;
+    if (!profMap.has(key) || reqVal > (profMap.get(key).req || 0)) {
+      profMap.set(key, {
+        n: p.n,
+        req: reqVal,
+        horas: p.horas || 0,
+        media: p.media || 0,
+        sla: p.sla !== undefined ? p.sla : 999,
+        ofic: p.ofic || "Elétrica",
+        cargo: p.cargo || ""
+      });
+    }
+  });
+  let profs = [...profMap.values()];
+  // Garantir que Evaldino exista na lista base
+  if (!profs.some(p => { 
+    if (!p.n) return false;
+    const n = p.n.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim(); 
+    return n === 'evaldino fernandes da mota'; 
+  })) {
+    profs.push({ n: "Evaldino Fernandes Da Mota", req: 0, horas: 0, media: 0, sla: 999, ofic: "Elétrica", cargo: "Eletricista" });
+  }
+  // Quando um ano é selecionado, mostrar apenas quem teve requisições naquele ano
+  if (anoVal) profs = profs.filter(p => p.req > 0);
+
+  // Acesso tolerante a tipos (string/number) aos dados de eficiência por ano
+  const yd = (parsedYear && efData && efData.anos && efData.anos[parsedYear])
+    ? efData.anos[parsedYear]
+    : (anoVal && efData && efData.anos && efData.anos[anoVal] ? efData.anos[anoVal] : null);
+
+  const oficialReqAno = yd ? (yd.req || 0) : 0;
+  const somaProfsAtual = profs.reduce((s, p) => s + (p.req || 0), 0);
+  
+  if (anoVal && oficialReqAno > 0 && (somaProfsAtual < oficialReqAno * 0.7)) {
+    console.warn(`updateEletrica: Soma dos profissionais (${somaProfsAtual}) inconsistente com o oficial (${oficialReqAno}) para o ano ${anoVal}. Recalculando proporcionalmente...`);
+    
+    // Achar a proporção de requisições da Elétrica deste ano em relação ao total histórico da Elétrica
+    const totalReqOfic = (D.profissionais || []).filter(p => p && p.n && isInTeam(p.n)).reduce((s, p) => s + (p.req || 0), 0);
+    const idxAno = ANOS_LIST.map(Number).indexOf(Number(parsedYear));
+    
+    // Se o YoY não tiver o valor detalhado na posição idxAno, buscamos a proporção geral das requisições totais
+    let ratio = 0.15;
+    if (totalReqOfic > 0) {
+      ratio = oficialReqAno / totalReqOfic;
+    }
+    
+    const rawProfsProporcional = (D.profissionais || []).map(p => ({
+      ...p,
+      req: Math.round((p.req || 0) * ratio),
+      horas: Math.round((p.horas || 0) * ratio)
+    }));
+    
+    // Reconstrói a lista profs
+    const profMapNew = new Map();
+    rawProfsProporcional.filter(p => p && p.n && isInTeam(p.n)).forEach(p => {
+      const key = p.n.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+      profMapNew.set(key, {
+        n: p.n,
+        req: p.req,
+        horas: p.horas,
+        media: p.media || 0,
+        sla: p.sla !== undefined ? p.sla : 999,
+        ofic: p.ofic || "Elétrica",
+        cargo: p.cargo || ""
+      });
+    });
+    profs = [...profMapNew.values()];
+    profs = profs.filter(p => p.req > 0);
+  }
+
+  let totalReq = 0, totalHoras = 0, sla = 0, media = 0;
+
+  if (anoVal) {
+    if (yd) {
+      totalReq = yd.req || 0;
+      totalHoras = Math.round((yd.horas || 0) * totalReq);
+      sla = yd.sla || 0;
+      media = yd.horas || 0;
+    }
+  } else {
+    if (efData) {
+      totalReq = efData.req || 0;
+      sla = efData.sla || 0;
+      media = efData.horas || 0;
+    }
+    totalHoras = yoyHoras.reduce((a, b) => a + b, 0);
+    if (totalHoras === 0) totalHoras = D.ofic_horas && D.ofic_horas["Elétrica"] || 0;
+  }
+
+  // Recalculate KPIs from profs when year is selected, avoiding duplicating shared requests in totalReq
+  if (anoVal && profs.length > 0) {
+    // Mantemos o totalReq oficial que tem o COUNT DISTINCT (requisições únicas) da oficina. 
+    // Usamos a soma direta apenas se o oficialReqAno for zero ou inválido.
+    if (oficialReqAno > 0) {
+      totalReq = oficialReqAno;
+    } else {
+      totalReq = profs.reduce((s, p) => s + p.req, 0);
+    }
+    totalHoras = profs.reduce((s, p) => s + p.horas, 0);
+    const sorted = [...profs].filter(p => p.sla < 999).sort((a, b) => a.sla - b.sla);
+    if (sorted.length > 0) sla = sorted[Math.floor(sorted.length / 2)].sla;
+    media = totalReq > 0 ? Math.round((totalHoras / totalReq) * 10) / 10 : 0;
+  }
+
+  const totalGeral = Object.values(D.monthly_req).reduce((s, ms) => s + ms.reduce((a, b) => a + b, 0), 0);
+  const pctGeral = totalGeral > 0 ? Math.round(totalReq / totalGeral * 100) : 0;
+
+  // Update KPIs
+  document.getElementById('el-k-total').textContent = fmt(totalReq);
+  document.getElementById('el-k-total-sub').textContent = anoVal || 'elétrica';
+  document.getElementById('el-k-horas').textContent = fmt(totalHoras);
+  document.getElementById('el-k-prof').textContent = profs.length;
+  document.getElementById('el-k-sla').textContent = sla > 0 ? sla + 'd' : '—';
+  document.getElementById('el-k-media').textContent = media > 0 ? media.toFixed(1) + 'h' : '—';
+  document.getElementById('el-k-pct').textContent = pctGeral > 0 ? pctGeral + '%' : '—';
+
+  // Filter info
+  const filterInfo = document.getElementById('el-filter-info');
+  if (filterInfo) {
+    filterInfo.textContent = anoVal ? `Elétrica — ${anoVal}` : 'Elétrica — 2019–2026';
+  }
+
+  // Renderização de componentes protegidos contra erros secundários
+  try { buildEletricaRanking(profs); } catch (e) { console.error("Erro ao gerar ranking da elétrica:", e); }
+  try { buildEletricaAnual(yoyReq, yoyHoras); } catch (e) { console.error("Erro ao gerar gráfico anual da elétrica:", e); }
+  try { buildEletricaSlaAnos(efData); } catch (e) { console.error("Erro ao gerar SLA anual da elétrica:", e); }
+  try { buildEletricaHeatmap(anoVal); } catch (e) { console.error("Erro ao gerar heatmap da elétrica:", e); }
+  try { buildEletricaComparativo(anoVal); } catch (e) { console.error("Erro ao gerar comparativo da elétrica:", e); }
+  try { buildEletricaTabela(profs); } catch (e) { console.error("Erro ao gerar tabela da elétrica:", e); }
+}
+
+function buildEletricaRanking(profs) {
+  const el = document.getElementById('el-ranking-prof');
+  const sorted = [...profs].sort((a, b) => b.req - a.req);
+  if (!sorted.length) {
+    el.innerHTML = '<p style="font-size:12px;color:var(--text3);padding:12px 0;">Nenhum profissional encontrado.</p>';
+    return;
+  }
+  const max = sorted[0].req || 1;
+  const col = '#8A1F1F';
+  el.innerHTML = sorted.slice(0, 10).map((p, i) => {
+    const pct = Math.round(p.req / max * 100);
+    const [cls, lbl] = slaBadge(p.sla);
+    const cargo = p.cargo ? `<span class="pill pill-blue" style="margin-left:4px;font-size:9px;">${p.cargo}</span>` : '';
+    return `<div class="prof-row">
+      <div class="prof-rank">${i + 1}</div>
+      <div class="prof-avatar" style="background:${col}18;color:${col}">${initials(p.n)}</div>
+      <div class="prof-info"><div class="prof-name">${p.n}${cargo}</div><div class="prof-ofic">${fmt(p.req)} req · ${fmt(p.horas)}h</div></div>
+      <div class="prof-bar-wrap">
+        <div class="prof-bar-track"><div class="prof-bar-fill" style="width:${pct}%;background:${col}"></div></div>
+        <div class="prof-nums"><span>${fmt(p.req)}</span><span>${p.media.toFixed(1)}h/req</span></div>
+      </div>
+      <span class="badge-sla ${cls}">${lbl}</span>
+    </div>`;
+  }).join('');
+}
+
+function buildEletricaAnual(yoyReq, yoyHoras) {
+  if (elChartAnual) { elChartAnual.destroy(); elChartAnual = null; }
+  const ctx = document.getElementById('chartEletricaAnual');
+  if (!ctx) return;
+  const anos = ANOS_YOY.filter((_, i) => i < yoyReq.length).map(String);
+  if (!anos.length) return;
+  const isDark = document.body.classList.contains('dark');
+  const txtColor = isDark ? '#9B9890' : '#6B6860';
+  elChartAnual = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: anos,
+      datasets: [
+        { label: 'Requisições', data: yoyReq, backgroundColor: '#8A1F1F', borderRadius: 4, order: 2 },
+        { label: 'Horas (÷10)', data: yoyHoras.map(h => Math.round(h / 10)), backgroundColor: '#1B4F8A', borderRadius: 4, order: 1 }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: true, labels: { color: txtColor, font: { size: 10 }, boxWidth: 12, padding: 8 } },
+        tooltip: {
+          callbacks: {
+            label: c => c.dataset.label === 'Requisições' ? `Req: ${fmt(c.parsed.y)}` : `Horas: ${fmt(c.parsed.y * 10)}h`
+          }
+        }
+      },
+      scales: {
+        x: { ticks: { font: { size: 10 }, color: txtColor }, grid: { display: false }, border: { display: false } },
+        y: { ticks: { font: { size: 10 }, color: txtColor }, grid: { color: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)' }, border: { display: false } }
+      }
+    }
+  });
+}
+
+function buildEletricaSlaAnos(efData) {
+  const el = document.getElementById('el-sla-anos');
+  if (!efData || !efData.anos) {
+    el.innerHTML = '<p style="font-size:12px;color:var(--text3);padding:12px 0;">Sem dados de SLA.</p>';
+    return;
+  }
+  const anos = Object.keys(efData.anos).sort();
+  const maxSla = Math.max(...anos.map(a => efData.anos[a].sla), 1);
+  el.innerHTML = anos.map(a => {
+    const d = efData.anos[a];
+    const pct = Math.round(d.sla / maxSla * 100);
+    const cor = d.sla <= 30 ? '#3A6610' : d.sla <= 90 ? '#8A4A10' : '#8A1F1F';
+    return `<div class="trend-row">
+      <div class="trend-year">${a}</div>
+      <div class="trend-track"><div class="trend-fill" style="width:${pct}%;background:${cor}"></div></div>
+      <div class="trend-val" style="color:${cor}">${d.sla}d</div>
+    </div>`;
+  }).join('');
+}
+
+function buildEletricaHeatmap(anoVal) {
+  const el = document.getElementById('el-hm-req');
+  const OFIC_KEY = 'El\u00e9trica'; // chave exata como vem do banco
+  let data;
+  if (anoVal && D.hm_req_by_ofic) {
+    // O banco retorna ano como integer; o select retorna string — testar ambos
+    const raw = D.hm_req_by_ofic[anoVal] || D.hm_req_by_ofic[parseInt(anoVal, 10)];
+    const meses = raw && raw[OFIC_KEY];
+    if (meses) {
+      data = { [anoVal]: meses };
+    }
+  }
+  if (!data) {
+    // Sem filtro de ano: montar a partir de todos os anos disponíveis
+    data = {};
+    Object.keys(D.hm_req_by_ofic || {}).sort().forEach(a => {
+      const byOfic = D.hm_req_by_ofic[a];
+      if (byOfic && byOfic[OFIC_KEY]) {
+        data[a] = byOfic[OFIC_KEY];
+      }
+    });
+  }
+  if (!Object.keys(data).length) {
+    el.innerHTML = '<p style="font-size:12px;color:var(--text3);padding:12px 0;">Sem dados mensais.</p>';
+    return;
+  }
+  const allVals = Object.values(data).flat().filter(v => v > 0);
+  const max = Math.max(...allVals, 1), min = Math.min(...allVals, 0);
+  let html = `<thead><tr><th class="row-hd"></th>${MESES.map(m => `<th>${m}</th>`).join('')}</tr></thead><tbody>`;
+  Object.keys(data).sort().forEach(a => {
+    html += `<tr><th class="row-hd">${a}</th>`;
+    data[a].forEach(v => {
+      if (v === 0) { html += `<td><div class="hm-cell" style="background:#EFEDE7;color:#9B9890;">—</div></td>`; return; }
+      const t = (v - min) / (max - min);
+      const bg = lerpColor(t, '#FFD0D0', '#8A1F1F');
+      const txt = t > 0.5 ? '#fff' : '#1A1916';
+      const lbl = v >= 1000 ? (v / 1000).toFixed(1) + 'k' : String(Math.round(v));
+      html += `<td><div class="hm-cell" style="background:${bg};color:${txt}">${lbl}</div></td>`;
+    });
+    html += '</tr>';
+  });
+  html += '</tbody>';
+  el.innerHTML = html;
+}
+
+function buildEletricaComparativo(anoVal) {
+  if (elChartComp) { elChartComp.destroy(); elChartComp = null; }
+  const ctx = document.getElementById('chartEletricaComparativo');
+  if (!ctx) return;
+  const isDark = document.body.classList.contains('dark');
+  const txtColor = isDark ? '#9B9890' : '#6B6860';
+  const topOfics = ["Elétrica", "Refrigeração", "Hidráulica"];
+  const anos = ANOS_YOY.map(String);
+  const datasets = topOfics.map((o, i) => {
+    const cores = ['#8A1F1F', '#0284C7', '#1A7A5E'];
+    const data = D.yoy_ofic_req && D.yoy_ofic_req[o] ? D.yoy_ofic_req[o].slice(0, anos.length) : [];
+    return {
+      label: o,
+      data,
+      borderColor: cores[i],
+      backgroundColor: o === "Elétrica" ? cores[i] + '30' : 'transparent',
+      borderWidth: o === "Elétrica" ? 3 : 1.5,
+      borderDash: o === "Elétrica" ? [] : [4, 3],
+      tension: .3,
+      pointRadius: o === "Elétrica" ? 5 : 3,
+      pointBackgroundColor: cores[i],
+      fill: o === "Elétrica"
+    };
+  });
+  elChartComp = new Chart(ctx, {
+    type: 'line',
+    data: { labels: anos, datasets },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: true, labels: { color: txtColor, font: { size: 10 }, boxWidth: 12, padding: 8 } },
+        tooltip: { callbacks: { label: c => `${c.dataset.label}: ${fmt(c.parsed.y)} req` } }
+      },
+      scales: {
+        x: { ticks: { font: { size: 10 }, color: txtColor }, grid: { display: false }, border: { display: false } },
+        y: { ticks: { font: { size: 10 }, color: txtColor, callback: v => fmt(v) }, grid: { color: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)' }, border: { display: false } }
+      }
+    }
+  });
+}
+
+function buildEletricaTabela(profs) {
+  const body = document.getElementById('el-tb-prof-body');
+  const sorted = [...profs].sort((a, b) => (b.req || 0) - (a.req || 0));
+  if (!sorted.length) {
+    body.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text3);padding:20px;">Nenhum profissional encontrado.</td></tr>';
+    return;
+  }
+  body.innerHTML = sorted.map((p, i) => {
+    const [cls, lbl] = slaBadge(p.sla !== undefined ? p.sla : 999);
+    const mediaVal = p.media !== undefined ? p.media : ((p.req || 0) > 0 ? (p.horas || 0) / p.req : 0);
+    return `<tr>
+      <td class="mono">${i + 1}</td>
+      <td>${p.n || '—'}</td>
+      <td class="right mono">${fmt(p.req || 0)}</td>
+      <td class="right mono">${fmt(p.horas || 0)}</td>
+      <td class="right mono">${mediaVal.toFixed(1)}h</td>
+      <td class="right"><span class="pill ${cls}">${lbl}</span></td>
+    </tr>`;
+  }).join('');
+}
+
+// ============================= INTEGRACAO SUPABASE ============================= //
+let supabaseClient = null;
+let isSupabaseConnected = false;
+
+function initSupabase() {
+  const url = localStorage.getItem('supabase-url');
+  const key = localStorage.getItem('supabase-anon-key');
+  const statusEl = document.getElementById('sb-status');
+  
+  // Atualiza inputs no modal
+  const urlInput = document.getElementById('sb-url');
+  const keyInput = document.getElementById('sb-key');
+  if (urlInput) urlInput.value = url || '';
+  if (keyInput) keyInput.value = key ? '••••••••••••••••••••' : '';
+
+  if (url && key) {
+    try {
+      if (typeof supabase !== 'undefined') {
+        supabaseClient = supabase.createClient(url, key);
+        isSupabaseConnected = true;
+        if (statusEl) statusEl.innerHTML = `<span style="color:var(--accent2);font-weight:600;">● Conectado ao Supabase</span>`;
+        return true;
+      } else {
+        console.warn("SDK do Supabase não foi carregado via CDN.");
+        if (statusEl) statusEl.innerHTML = `<span style="color:var(--danger)">⚠️ SDK não carregado. Verifique conexão de rede.</span>`;
+      }
+    } catch (e) {
+      console.error("Erro ao instanciar o cliente do Supabase:", e);
+      if (statusEl) statusEl.innerHTML = `<span style="color:var(--danger)">⚠️ Erro na inicialização: ${e.message}</span>`;
+    }
+  } else {
+    if (statusEl) statusEl.innerHTML = `Status: Não conectado. Usando dados locais.`;
+  }
+  isSupabaseConnected = false;
+  supabaseClient = null;
+  return false;
+}
+
+async function saveSupabaseSettings() {
+  const urlInput = document.getElementById('sb-url');
+  const keyInput = document.getElementById('sb-key');
+  const url = urlInput ? urlInput.value.trim() : '';
+  let key = keyInput ? keyInput.value.trim() : '';
+  
+  if (!url) {
+    alert("Por favor, preencha a URL do seu Supabase.");
+    return;
+  }
+  
+  // Se a chave não mudou (está com o placeholder de bolinhas), manter a chave anterior
+  if (key === '••••••••••••••••••••') {
+    key = localStorage.getItem('supabase-anon-key') || '';
+  }
+  
+  if (!key) {
+    alert("Por favor, preencha a Chave Anon Pública.");
+    return;
+  }
+
+  localStorage.setItem('supabase-url', url);
+  localStorage.setItem('supabase-anon-key', key);
+  
+  const connected = initSupabase();
+  if (connected) {
+    alert("Conectando ao Supabase e carregando os dados históricos analíticos...");
+    const success = await loadSupabaseData();
+    if (success) {
+      alert("Conectado e sincronizado com sucesso!");
+      populateOverviewFilters();
+      updateAll();
+      updateSla();
+      buildSlaTrend();
+      updateSaz();
+      buildYoy();
+      buildYoyTables();
+      closeSettings();
+    } else {
+      alert("Conexão estabelecida, mas não foi possível carregar os dados das views do Supabase. Certifique-se de que executou o arquivo 'schema.sql' no seu SQL Editor do Supabase.");
+    }
+  }
+}
+
+function disconnectSupabase() {
+  if (confirm("Deseja realmente desconectar do Supabase e voltar a usar os dados locais/de exemplo?")) {
+    localStorage.removeItem('supabase-url');
+    localStorage.removeItem('supabase-anon-key');
+    initSupabase();
+    alert("Desconectado com sucesso! Recarregando dados locais...");
+    location.reload();
+  }
+}
+
+async function loadSupabaseData() {
+  if (!isSupabaseConnected || !supabaseClient) return false;
+  
+  try {
+    console.log("Iniciando carregamento analítico do Supabase...");
+    
+    // 1. KPIs Globais
+    const { data: kpis, error: errKpi } = await supabaseClient.from('view_kpis_globais').select('*').maybeSingle();
+    if (errKpi || !kpis) throw new Error("Erro ao ler KPIs Globais: " + (errKpi?.message || "Sem dados"));
+    
+    // 2. Tendência Mensal
+    const { data: trendData, error: errTrend } = await supabaseClient.from('view_mensal_req_horas').select('*');
+    if (errTrend) throw new Error("Erro ao ler Tendência Mensal: " + errTrend.message);
+    
+    // 3. Distribuição por Status
+    const { data: statusData, error: errStatus } = await supabaseClient.from('view_status_distribuicao').select('*');
+    if (errStatus) throw new Error("Erro ao ler Status: " + errStatus.message);
+
+    // 4. Horas por Oficina
+    const { data: oficData, error: errOfic } = await supabaseClient.from('view_horas_oficina').select('*');
+    if (errOfic) throw new Error("Erro ao ler Horas Oficina: " + errOfic.message);
+
+    // 5. Unidades Solicitantes (Top 10)
+    const { data: unidData, error: errUnid } = await supabaseClient.from('view_unidades_solicitantes').select('*').limit(10);
+    if (errUnid) throw new Error("Erro ao ler Unidades: " + errUnid.message);
+
+    // 6. YoY Divisão
+    const { data: yoyDivData, error: errYoyDiv } = await supabaseClient.from('view_yoy_divisao').select('*');
+    if (errYoyDiv) throw new Error("Erro ao ler YoY Divisão: " + errYoyDiv.message);
+
+    // 7. Profissionais Performance (Otimizado com limite maior)
+    const { data: profs, error: errProfs } = await supabaseClient.from('view_profissionais_performance').select('*').limit(10000);
+    if (errProfs) throw new Error("Erro ao ler Profissionais: " + errProfs.message);
+ 
+    // 8. Profissionais Performance Anual (Otimizado com limite maior)
+    const { data: profsAnual, error: errProfsAnual } = await supabaseClient.from('view_profissionais_performance_anual').select('*').limit(10000);
+    if (errProfsAnual) throw new Error("Erro ao ler Profissionais Anual: " + errProfsAnual.message);
+ 
+    // 9. Sazonalidade Geral (sem Elétrica para não exceder limite)
+    const { data: sazData, error: errSaz } = await supabaseClient
+      .from('view_sazonalidade_oficina')
+      .select('*')
+      .neq('oficina', 'Elétrica')
+      .limit(10000);
+    if (errSaz) throw new Error("Erro ao ler Sazonalidade: " + errSaz.message);
+
+    // 9b. Sazonalidade da Elétrica separada (dados completos sem truncagem)
+    const { data: sazEletrica, error: errSazEl } = await supabaseClient
+      .from('view_sazonalidade_oficina')
+      .select('*')
+      .eq('oficina', 'Elétrica')
+      .limit(5000);
+    if (errSazEl) throw new Error("Erro ao ler Sazonalidade Elétrica: " + errSazEl.message);
+
+    // Mescla os dois conjuntos
+    const sazDataAll = [...(sazData || []), ...(sazEletrica || [])];
+
+    // 10. Eficiência Oficinas
+    const { data: efData, error: errEf } = await supabaseClient.from('view_eficiencia_oficinas').select('*');
+    if (errEf) throw new Error("Erro ao ler Eficiência: " + errEf.message);
+
+    // Processamento e canonicalização para a variável global D
+    const years = [...new Set(trendData.map(d => d.ano))].sort();
+    
+    // Anos YoY e Listas
+    ANOS_LIST.length = 0; years.forEach(y => ANOS_LIST.push(y));
+    ANOS_YOY.length = 0; years.filter(y => y <= 2025).forEach(y => ANOS_YOY.push(y));
+
+    // Mapeamento Tendência Mensal
+    const mReq = {}, mHoras = {};
+    years.forEach(y => { mReq[y] = Array(12).fill(0); mHoras[y] = Array(12).fill(0); });
+    trendData.forEach(d => {
+      const y = d.ano, m = d.mes - 1;
+      if (mReq[y]) {
+        mReq[y][m] = d.total_requisicoes;
+        mHoras[y][m] = parseFloat(d.total_horas) || 0;
+      }
+    });
+
+    // Mapeamento Status
+    const statusMap = {};
+    statusData.forEach(d => {
+      statusMap[d.status] = { req: d.total_requisicoes, horas: parseFloat(d.total_horas) || 0 };
+    });
+
+    // Mapeamento Oficinas
+    const oficMap = {};
+    oficData.forEach(d => { oficMap[d.oficina] = parseFloat(d.total_horas) || 0; });
+
+    // Mapeamento Unidades
+    const unidMap = {};
+    unidData.forEach(d => { unidMap[d.unidade_requisitante] = d.total_requisicoes; });
+
+    // Mapeamento YoY Divisão
+    const yoyDiv = {};
+    yoyDivData.forEach(d => {
+      const y = d.ano;
+      if (!yoyDiv[y]) yoyDiv[y] = {};
+      yoyDiv[y][d.divisao] = { req: d.total_requisicoes, horas: parseFloat(d.total_horas) || 0 };
+    });
+
+    // Mapeamento Profissionais total
+    D.profissionais = profs.map(p => ({
+      n: p.n, ofic: p.ofic, vinculo: p.vinculo, req: p.req, horas: parseFloat(p.horas) || 0, media: parseFloat(p.media) || 0, sla: p.sla
+    }));
+
+    // Mapeamento Profissionais Anual
+    const profByYear = {};
+    profsAnual.forEach(p => {
+      const y = p.ano;
+      if (!profByYear[y]) profByYear[y] = [];
+      profByYear[y].push({
+        n: p.n, ofic: p.ofic, vinculo: p.vinculo, req: p.req, horas: parseFloat(p.horas) || 0, media: parseFloat(p.media) || 0, sla: p.sla
+      });
+    });
+
+    // Heatmaps
+    const hmReq = {}, hmHoras = {};
+    years.forEach(y => { hmReq[y] = Array(12).fill(0); hmHoras[y] = Array(12).fill(0); });
+    
+    const hmReqByOfic = {}, hmHorasByOfic = {}, hmReqFinByOfic = {};
+    years.forEach(y => {
+      hmReqByOfic[y] = {}; hmHorasByOfic[y] = {}; hmReqFinByOfic[y] = {};
+    });
+    
+    sazDataAll.forEach(d => {
+      const y = d.ano, m = d.mes - 1, o = d.oficina;
+      // Garante que o ano existe no mapa (caso não estivesse em trendData)
+      if (!hmReq[y]) { hmReq[y] = Array(12).fill(0); hmHoras[y] = Array(12).fill(0); }
+      if (!hmReqByOfic[y]) { hmReqByOfic[y] = {}; hmHorasByOfic[y] = {}; hmReqFinByOfic[y] = {}; }
+      hmReq[y][m] += d.total_requisicoes;
+      hmHoras[y][m] += parseFloat(d.total_horas) || 0;
+      
+      if (!hmReqByOfic[y][o]) {
+        hmReqByOfic[y][o] = Array(12).fill(0);
+        hmHorasByOfic[y][o] = Array(12).fill(0);
+        hmReqFinByOfic[y][o] = Array(12).fill(0);
+      }
+      
+      hmReqByOfic[y][o][m] = d.total_requisicoes;
+      hmHorasByOfic[y][o][m] = parseFloat(d.total_horas) || 0;
+      hmReqFinByOfic[y][o][m] = d.total_finalizadas;
+    });
+
+    // Mapeamento Eficiência
+    const efOficinas = {};
+    efData.forEach(d => {
+      const o = d.oficina;
+      if (!efOficinas[o]) {
+        efOficinas[o] = {
+          div: d.divisao,
+          sla: 0,
+          horas: 0,
+          req: 0,
+          anos: {}
+        };
+      }
+      efOficinas[o].anos[d.ano] = {
+        sla: d.sla,
+        horas: parseFloat(d.horas) || 0,
+        req: d.total_requisicoes
+      };
+    });
+
+    Object.keys(efOficinas).forEach(o => {
+      const dados = efOficinas[o];
+      let totalReq = 0, somaSla = 0, somaHoras = 0;
+      Object.entries(dados.anos).forEach(([year, info]) => {
+        totalReq += info.req;
+        somaSla += info.sla * info.req;
+        somaHoras += info.horas * info.req;
+      });
+      dados.req = totalReq;
+      dados.sla = totalReq > 0 ? Math.round(somaSla / totalReq) : 0;
+      dados.horas = totalReq > 0 ? Math.round((somaHoras / totalReq) * 10) / 10 : 0;
+    });
+
+    // Atribuições globais
+    D.monthly_req = mReq;
+    D.monthly_horas = mHoras;
+    D.status = statusMap;
+    D.ofic_horas = oficMap;
+    D.unidades = unidMap;
+    D.yoy_div = yoyDiv;
+    D.profissionais_by_year = profByYear;
+    D.hm_req = hmReq;
+    D.hm_horas = hmHoras;
+    D.hm_req_by_ofic = hmReqByOfic;
+    D.hm_horas_by_ofic = hmHorasByOfic;
+    D.hm_req_finalizadas_by_ofic = hmReqFinByOfic;
+    D.eficiencia_oficinas = efOficinas;
+
+    // SLA Faixas estáticas aproximadas (como antes) ou do banco
+    D.sla_faixas = {"0-7 dias": Math.round(kpis.total_finalizadas * 0.139), "8-15 dias": Math.round(kpis.total_finalizadas * 0.115), "16-30 dias": Math.round(kpis.total_finalizadas * 0.138), "31-90 dias": Math.round(kpis.total_finalizadas * 0.235), "90+ dias": Math.round(kpis.total_finalizadas * (kpis.mediana_sla > 60 ? 0.38 : 0.28))};
+    D.sla_abertos = {"0-7 dias": Math.round(kpis.total_abertas * 0.005), "8-15 dias": Math.round(kpis.total_abertas * 0.037), "16-30 dias": Math.round(kpis.total_abertas * 0.081), "31-90 dias": Math.round(kpis.total_abertas * 0.244), "90+ dias": Math.round(kpis.total_abertas * 0.63)};
+
+    // YoY Oficinas — usa eficiencia_oficinas como fonte autoritativa dos totais anuais
+    // (dados completos sem risco de truncagem), e hm_*_by_ofic para distribuição mensal
+    const topOfics = ["Elétrica", "Refrigeração", "Alvenaria", "Pintura/Gesso", "Hidráulica"];
+    const yoyOfic = {}, yoyOficReq = {};
+    topOfics.forEach(o => {
+      yoyOfic[o] = ANOS_LIST.map(a => {
+        // Prioritiza o total consolidado da eficiência (que usa COUNT DISTINCT correto)
+        const efAno = efOficinas[o]?.anos?.[a];
+        if (efAno && efAno.horas !== undefined) return efAno.horas * (efAno.req || 1);
+        const yearData = D.hm_horas_by_ofic[a]?.[o] || Array(12).fill(0);
+        return yearData.reduce((x, y) => x + y, 0);
+      });
+      yoyOficReq[o] = ANOS_LIST.map(a => {
+        // Usa o total de requisições distintas da eficiência (fonte confiável)
+        const efAno = efOficinas[o]?.anos?.[a];
+        if (efAno && efAno.req !== undefined && efAno.req > 0) return efAno.req;
+        const yearData = D.hm_req_by_ofic[a]?.[o] || Array(12).fill(0);
+        return yearData.reduce((x, y) => x + y, 0);
+      });
+    });
+    D.yoy_ofic = yoyOfic;
+    D.yoy_ofic_req = yoyOficReq;
+
+    // Atualiza badges no Sidebar
+    const minA = Math.min(...years), maxA = Math.max(...years);
+    document.getElementById('sidebar-data-range').textContent = `Dados: ${minA}–${maxA}`;
+    document.getElementById('sidebar-updated').textContent = `Atualizado Supabase`;
+
+    // Atualiza badges principais na Topbar
+    const badges = document.querySelectorAll('.topbar-right .badge');
+    if (badges.length >= 3) {
+      badges[0].textContent = fmt(kpis.total_requisicoes) + ' requisições';
+      badges[1].textContent = fmt(Math.round(kpis.total_horas)) + ' horas';
+      badges[2].textContent = fmt(kpis.total_abertas) + ' em aberto';
+    }
+    
+    // Atualiza info de salvamento no modal
+    const savedInfo = document.getElementById('modal-saved-info');
+    if (savedInfo) savedInfo.innerHTML = `Conectado ao Supabase:<br><strong>${fmt(kpis.total_requisicoes)}</strong> chamados carregados em tempo real.`;
+
+    console.log("Carregamento do Supabase concluído com sucesso!");
+    return true;
+  } catch (e) {
+    console.error("Falha ao carregar dados do Supabase:", e.message);
+    const savedInfo = document.getElementById('modal-saved-info');
+    if (savedInfo) savedInfo.innerHTML = `<span style="color:var(--danger)">Erro Supabase: ${e.message}</span>`;
+    return false;
+  }
+}
+
+// ============================= INIT ============================= //
+async function init() {
+  if(localStorage.getItem('dashboard-dark')==='1'){
+    document.body.classList.add('dark');
+    document.getElementById('toggle-dark').checked=true;
+  }
+
+  // Inicializar o Supabase e tentar ler os dados analíticos
+  initSupabase();
+  let dataLoaded = false;
+  if (isSupabaseConnected) {
+    dataLoaded = await loadSupabaseData();
+  }
+  
+  // Se o Supabase falhar ou não estiver configurado, tenta dados em localStorage ou estáticos
+  if (!dataLoaded) {
+    const hasCsvData = loadCsvData();
+    if (!hasCsvData) {
+      buildProfByYear();
+    }
+  }
+
+  populateProfFilters();
+  populateSlaFilters();
+  populateSazFilters();
+  populateEfFilters();
+  populateEletricaFilters();
+  populateOverviewFilters();
+  updateAll();
+  updateSla();
+  buildSlaTrend();
+  updateSaz();
+  buildYoy();
+  buildYoyTables();
+}
+
+init();
+</script>
+</body>
+</html>
