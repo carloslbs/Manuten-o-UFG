@@ -3152,9 +3152,12 @@ function updateEletrica() {
     }
   }
 
+  let isEstimated = false;
+
   // Se o ano foi selecionado, mas não temos dados específicos detalhados salvos para esse ano em profsByYear,
   // nós escalamos a lista master proporcionalmente para esse ano.
   if (anoVal && (!rawProfs || rawProfs.length === 0)) {
+    isEstimated = true;
     const idxAno = ANOS_LIST.map(Number).indexOf(Number(parsedYear));
     let ratio = 0.15; // padrão aproximado
     if (idxAno !== -1 && D.yoy_ofic_req && D.yoy_ofic_req["Elétrica"] && D.yoy_ofic_req["Elétrica"][idxAno] !== undefined) {
@@ -3180,7 +3183,8 @@ function updateEletrica() {
     anoVal,
     parsedYear,
     hasParsedYearData: !!(parsedYear && D.profissionais_by_year && D.profissionais_by_year[parsedYear]),
-    rawProfsLength: rawProfs.length
+    rawProfsLength: rawProfs.length,
+    isEstimated
   });
 
   const profMap = new Map();
@@ -3219,7 +3223,7 @@ function updateEletrica() {
   const oficialReqAno = yd ? (yd.req || 0) : 0;
   const somaProfsAtual = profs.reduce((s, p) => s + (p.req || 0), 0);
   
-  if (anoVal && oficialReqAno > 0 && (somaProfsAtual < oficialReqAno * 0.7)) {
+  if (isEstimated && anoVal && oficialReqAno > 0 && (somaProfsAtual < oficialReqAno * 0.7)) {
     console.warn(`updateEletrica: Soma dos profissionais (${somaProfsAtual}) inconsistente com o oficial (${oficialReqAno}) para o ano ${anoVal}. Recalculando proporcionalmente...`);
     
     // Achar a proporção de requisições da Elétrica deste ano em relação ao total histórico da Elétrica
